@@ -1,0 +1,51 @@
+import rospy
+import moveit_commander
+import geometry_msgs.msg
+from moveit_commander import PlanningSceneInterface
+
+def setup_collision_object():
+    # Initialize node
+    rospy.init_node("moveit_python_interface", anonymous=True)
+
+    # Initialize moveit_commander
+    moveit_commander.roscpp_initialize(sys.argv)
+    robot = moveit_commander.RobotCommander()
+    scene = PlanningSceneInterface()
+    group_name = "arm"  # Change to your group name
+    group = moveit_commander.MoveGroupCommander(group_name)
+
+    # Define the collision object
+    collision_object = moveit_commander.CollisionObject()
+    box_pose = geometry_msgs.msg.PoseStamped()
+    box_pose.header.frame_id = group.get_planning_frame()
+    box_pose.pose.orientation.w = 1.0
+    box_pose.pose.position.x = 0.5
+    box_pose.pose.position.y = 0
+    box_pose.pose.position.z = 0.25
+    collision_object.id = "box1"
+    collision_object.set_pose(box_pose)
+    collision_object.add_box(0.1, 0.5, 0.5)  # Dimensions for the box
+
+    # Add the collision object to the world
+    scene.add_collision_object(collision_object)
+
+def plan_to_pose_goal(group, pose_goal):
+    # Set the pose target
+    group.set_pose_target(pose_goal)
+
+    # Plan to the goal and execute
+    plan = group.plan()
+    group.execute(plan, wait=True)
+
+    # Clear the target pose
+    group.clear_pose_targets()
+
+# Example usage
+if __name__ == '__main__':
+    setup_collision_object()
+    pose_goal = geometry_msgs.msg.Pose()
+    pose_goal.orientation.w = 1.0
+    pose_goal.position.x = 0.3
+    pose_goal.position.y = 0.2
+    pose_goal.position.z = 0.4
+    plan_to_pose_goal(group, pose_goal)
