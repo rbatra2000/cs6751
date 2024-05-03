@@ -15,8 +15,6 @@ from interbotix_xs_modules.arm import InterbotixManipulatorXS
 from moveit_commander.conversions import pose_to_list
 from shape_msgs.msg import SolidPrimitive
 
-# testing
-
 def all_close(goal, actual, tolerance):
   """
   Convenience method for testing if a list of values are within a tolerance of their counterparts in another list
