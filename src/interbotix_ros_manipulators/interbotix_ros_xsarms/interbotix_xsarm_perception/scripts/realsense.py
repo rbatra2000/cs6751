@@ -14,8 +14,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Pose
 
-#TEST
-
 class PixelSelector:
     def __init__(self):
         pass
