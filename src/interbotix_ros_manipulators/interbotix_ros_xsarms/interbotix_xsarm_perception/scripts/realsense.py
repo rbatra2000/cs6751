@@ -14,6 +14,8 @@ from visualization_msgs.msg import Marker, MarkerArray
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Pose
 
+MIN_BLUEB_AREA = 100
+
 class PixelSelector:
     def __init__(self):
         pass
@@ -45,15 +47,50 @@ class PixelSelector:
 
             if len(bluecnts) > 0:
                  for cnt in bluecnts:
-                    #   area =cv2.contourArea(cnt)
+                    area =cv2.contourArea(cnt)
+
+                    # we are adding a threshold to make sure that we have valid blueberries
+                    # TODO: this is arbitrary for now but we can change
+                    if area < MIN_BLUEB_AREA:
+                        print("Skipped blueberry due to small area")
+                        continue
                     #   print(area)
                     (xg,yg,wg,hg) = cv2.boundingRect(cnt)
                     x,y = ((int)(xg+wg/2), (int)(yg+hg/2))
-                    # cv2.rectangle(image,(xg,yg), (xg+wg, yg+hg), (0,255,0), 2)
+                    # cv2.rectangle(self.img,(xg,yg), (xg+wg, yg+hg), (0,255,0), 2)
 
                     # cv2.circle(image, ((int)(xg+wg/2), (int)(yg+hg/2)), 2, (0, 255, 0), 2)
                     self.clicks.append([x,y])
-                    cv2.circle(self.img, (x,y), 10, (0, 255, 0), -1)
+                    cv2.circle(self.img, (x,y), 5, (0, 255, 0), -1)
+
+                    # TODO: here let's try to see if we can figure out if the occlusion is on the right or left
+
+                    obstacle_direction = "no_obstruction"
+                    # assume obstruction is only one side
+                    # here are green ranges
+                    lower_green = np.array([25,50,50])
+                    upper_green = np.array([90,255,255])
+
+                    # first check left
+
+                    # new rectangle for left
+                    (xl,yl,wl,hl) = (int(xg-wg),yg,wg*2,hg)
+                    # left_img = self.img[xl:xl+wl, yl:yl+hl]
+                    # left_frame = cv2.cvtColor(left_img, cv2.COLOR_BGR2HSV)
+                    cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (255,0,0), 1)
+
+                    left_mask = cv2.inRange(frame.copy()[xl:xl+wl, yl:yl+hl], lower_green, upper_green)
+                    # cv2.imshow('left mask', left_mask)
+                    # cv2.waitKey()
+                    print(cv2.countNonZero(left_mask))
+                    if cv2.countNonZero(left_mask) > 25:
+                        print("YES")
+                    
+
+                    # check if 
+
+
+
             cv2.imshow("pixel_selector", self.img)
 
     def mouse_callback(self, event, x, y, flags, param):

@@ -140,7 +140,12 @@ def image_callback(img_msg):
             lower_blue = np.array([10,100,20])
             upper_blue = np.array([25,255,255])
 
-            mask = cv2.inRange(frame, lower_blue, upper_blue)
+            lower_green = np.array([25,50,50])
+            upper_green = np.array([100,255,255])
+
+            mask = cv2.inRange(frame, lower_green, upper_green)
+
+            print(cv2.countNonZero(mask))
 
             # okay now lets create contours so we can identify the blue objects
             bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
