@@ -15,6 +15,7 @@ from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Pose
 
 MIN_BLUEB_AREA = 100
+MIN_LEAF_AREA = 50
 
 class PixelSelector:
     def __init__(self):
@@ -22,6 +23,11 @@ class PixelSelector:
 
     def load_image(self, img):
         self.img = img
+
+    def intersection(self,a,b):
+        if a[0]+a[2] < b[0] or a[0] > b[0]+b[2] or a[1]+a[3] < b[1] or a[1]>b[1]+b[3]:
+            return False
+        return True
 
     def get_blueberries_coordinates(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDBLCLK:
@@ -56,35 +62,45 @@ class PixelSelector:
                         continue
                     #   print(area)
                     (xg,yg,wg,hg) = cv2.boundingRect(cnt)
-                    x,y = ((int)(xg+wg/2), (int)(yg+hg/2))
-                    # cv2.rectangle(self.img,(xg,yg), (xg+wg, yg+hg), (0,255,0), 2)
+                    center_x, center_y= ((int)(xg+wg/2), (int)(yg+hg/2))
+                    cv2.rectangle(self.img,(xg,yg), (xg+wg, yg+hg), (255,0,0), 2)
 
                     # cv2.circle(image, ((int)(xg+wg/2), (int)(yg+hg/2)), 2, (0, 255, 0), 2)
-                    self.clicks.append([x,y])
-                    cv2.circle(self.img, (x,y), 5, (0, 255, 0), -1)
+                    self.clicks.append([center_x,center_y])
+                    cv2.circle(self.img, (center_x,center_y), 1, (0, 0, 255), -1)
 
                     # TODO: here let's try to see if we can figure out if the occlusion is on the right or left
 
-                    obstacle_direction = "no_obstruction"
-                    # assume obstruction is only one side
                     # here are green ranges
                     lower_green = np.array([25,50,50])
                     upper_green = np.array([90,255,255])
 
-                    # first check left
+                    # create green mask this time
+                    green_mask = cv2.inRange(frame.copy(), lower_green, upper_green)
 
-                    # new rectangle for left
-                    (xl,yl,wl,hl) = (int(xg-wg),yg,wg*2,hg)
-                    # left_img = self.img[xl:xl+wl, yl:yl+hl]
-                    # left_frame = cv2.cvtColor(left_img, cv2.COLOR_BGR2HSV)
-                    cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (255,0,0), 1)
+                    # get contours to separate the leaves
+                    greencnts = cv2.findContours(green_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-                    left_mask = cv2.inRange(frame.copy()[xl:xl+wl, yl:yl+hl], lower_green, upper_green)
-                    # cv2.imshow('left mask', left_mask)
+                    # see if the bounding box of any leaves are overlapping with the blueberry
+                    for gCnt in greencnts:
+                        (xl, yl, wl, hl) = cv2.boundingRect(gCnt)
+                        area =cv2.contourArea(gCnt)
+
+                        # we are adding a threshold to make sure that we have valid blueberries
+                        # TODO: this is arbitrary for now but we can change
+                        if area < MIN_LEAF_AREA:
+                            continue
+
+                        if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
+                            cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
+                            leaf_x, leaf_y = ((int)(xl+wl/2), (int)(yl+hl/2))
+                            if leaf_x < center_x:
+                                print("Leaf is on left")
+                            else:
+                                print("Leaf is on right")
+
+                    # cv2.imshow('left mask', green_mask)
                     # cv2.waitKey()
-                    print(cv2.countNonZero(left_mask))
-                    if cv2.countNonZero(left_mask) > 25:
-                        print("YES")
                     
 
                     # check if 
@@ -116,6 +132,11 @@ class PixelSelector:
         return self.clicks
 
 class RealSenseROS:
+
+    
+
+
+
     def __init__(self):
         self.bridge = CvBridge()
 

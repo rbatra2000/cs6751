@@ -1,8 +1,8 @@
 import time
 import colorsys
-from interbotix_xs_modules.arm import InterbotixManipulatorXS
-from interbotix_perception_modules.apriltag import InterbotixAprilTagInterface
-from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
+# from interbotix_xs_modules.arm import InterbotixManipulatorXS
+# from interbotix_perception_modules.apriltag import InterbotixAprilTagInterface
+# from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 # from interbotix_ros_toolboxes.interbotix_perception_toolbox.interbotix_perception_modules.setup import PictureSnapper
 
 # interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/scripts/picture_snapper
@@ -17,7 +17,7 @@ import os
 import rospy
 import threading
 from sensor_msgs.msg import Image
-from interbotix_perception_modules.srv import SnapPicture, SnapPictureResponse
+# from interbotix_perception_modules.srv import SnapPicture, SnapPictureResponse
 
 
 # To start this application, open a terminal on the robot and type...
@@ -126,7 +126,7 @@ def show_image(img):
 
 
 def image_callback(img_msg):
-        # rospy.loginfo(img_msg.header)
+        rospy.loginfo(img_msg.header)
 
         try:
             image = bridge.imgmsg_to_cv2(img_msg, "passthrough")
@@ -146,7 +146,6 @@ def image_callback(img_msg):
             mask = cv2.inRange(frame, lower_green, upper_green)
 
             print(cv2.countNonZero(mask))
-# testing  
             # okay now lets create contours so we can identify the blue objects
             bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
@@ -186,8 +185,8 @@ def image_callback(img_msg):
 
 def main():
     # Initialize the arm module along with the pointcloud and armtag modules
-    bot = InterbotixManipulatorXS("wx250s", moving_time=3, accel_time=0.75)
-    pcl = InterbotixPointCloudInterface()
+    # bot = InterbotixManipulatorXS("wx250s", moving_time=3, accel_time=0.75)
+    # pcl = InterbotixPointCloudInterface()
 
     # camera_info_topic = rospy.get_param(
     #         "/" + "apriltag" + "/camera_info_topic",
@@ -196,6 +195,8 @@ def main():
     sub_image = rospy.Subscriber("/camera/color/image_raw", Image, image_callback)
     # TEST
     # cv2.namedWindow("Window", 1)
+    # while True:
+    #      print("TEST")
 
     # while not rospy.is_shutdown():
     rospy.spin()
