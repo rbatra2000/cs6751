@@ -146,7 +146,7 @@ def image_callback(img_msg):
             mask = cv2.inRange(frame, lower_green, upper_green)
 
             print(cv2.countNonZero(mask))
-
+# testing  
             # okay now lets create contours so we can identify the blue objects
             bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
