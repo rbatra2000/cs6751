@@ -1,8 +1,0 @@
-prefix=/home/group8/interbotix_ws/devel
-
-Name: interbotix_xs_rviz
-Description: Description of interbotix_xs_rviz
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

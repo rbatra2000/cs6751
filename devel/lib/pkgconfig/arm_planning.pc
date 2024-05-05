@@ -1,8 +1,0 @@
-prefix=/home/group8/interbotix_ws/devel
-
-Name: arm_planning
-Description: Description of arm_planning
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
