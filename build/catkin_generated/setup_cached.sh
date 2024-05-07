@@ -7,4 +7,9 @@
 # new environment variables
 
 # modified environment variables
+export CMAKE_PREFIX_PATH="/home/group8/interbotix_ws/devel:$CMAKE_PREFIX_PATH"
+export LD_LIBRARY_PATH="/home/group8/interbotix_ws/devel/lib:$LD_LIBRARY_PATH"
 export PWD='/home/group8/interbotix_ws/build'
+export PYTHONPATH="/home/group8/interbotix_ws/devel/lib/python3/dist-packages:$PYTHONPATH"
+export ROSLISP_PACKAGE_DIRECTORIES='/home/group8/interbotix_ws/devel/share/common-lisp'
+export ROS_PACKAGE_PATH="/home/group8/interbotix_ws/src:$ROS_PACKAGE_PATH"

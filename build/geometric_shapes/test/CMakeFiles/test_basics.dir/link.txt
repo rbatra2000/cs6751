@@ -1,0 +1,1 @@
+/usr/bin/c++  -O3 -DNDEBUG  -rdynamic CMakeFiles/test_basics.dir/test_basics.cpp.o  -o /home/group8/interbotix_ws/devel/lib/geometric_shapes/test_basics   -L/home/group8/interbotix_ws/build/gtest  -Wl,-rpath,/home/group8/interbotix_ws/build/gtest:/home/group8/interbotix_ws/build/gtest/lib ../../gtest/lib/libgtest.so -lpthread 
