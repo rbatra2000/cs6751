@@ -236,12 +236,6 @@ def main():
     tutorial.go_to_home_position()
     # tutorial.add_box()
 
-
-    # TODO(ritikbatra): This is where Ritik will add CV stuff (comment out if doing other testing)
-    # print("============ Press `Enter` to execute a movement towards a ripe blueberry ...")
-    # input()
-
-
     print("============ Press `Enter` to plan and execute a path to pick a box ...")
     input()
     plan, fraction = tutorial.plan_cartesian_path_to_pick_box()

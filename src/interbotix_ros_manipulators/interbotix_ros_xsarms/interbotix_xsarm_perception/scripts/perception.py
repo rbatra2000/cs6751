@@ -1,8 +1,8 @@
 import time
 import colorsys
-# from interbotix_xs_modules.arm import InterbotixManipulatorXS
-# from interbotix_perception_modules.apriltag import InterbotixAprilTagInterface
-# from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
+from interbotix_xs_modules.arm import InterbotixManipulatorXS
+from interbotix_perception_modules.apriltag import InterbotixAprilTagInterface
+from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 # from interbotix_ros_toolboxes.interbotix_perception_toolbox.interbotix_perception_modules.setup import PictureSnapper
 
 # interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/scripts/picture_snapper
@@ -185,8 +185,8 @@ def image_callback(img_msg):
 
 def main():
     # Initialize the arm module along with the pointcloud and armtag modules
-    # bot = InterbotixManipulatorXS("wx250s", moving_time=3, accel_time=0.75)
-    # pcl = InterbotixPointCloudInterface()
+    bot = InterbotixManipulatorXS("wx250s", moving_time=3, accel_time=0.75)
+    pcl = InterbotixPointCloudInterface()
 
     # camera_info_topic = rospy.get_param(
     #         "/" + "apriltag" + "/camera_info_topic",

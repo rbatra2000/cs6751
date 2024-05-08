@@ -391,7 +391,7 @@ class MoveGroupPythonIntefaceTutorial(object):
 
 
 def main():
-    # bot = InterbotixManipulatorXS("wx250s", "arm", "gripper")
+    bot = InterbotixManipulatorXS("wx250s", "arm", "gripper")
     # bot.dxl.robot_set_operating_modes("group", "arm", "pwm")
     print("============ Press `Enter` to begin the tutorial by setting up the moveit_commander (press ctrl-d to exit) ...")
     input()
