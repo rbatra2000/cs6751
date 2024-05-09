@@ -91,7 +91,8 @@ class InterbotixArmTagInterface(object):
         self.trans.header.stamp = rospy.Time.now()
         self.apriltag.pub_transforms.publish(self.trans)
 
-        return True
+        # TODO: change back to return True
+        return self.trans
 
     ### @brief Helper function to lookup a transform and convert it into a 4x4 transformation matrix
     ### @param tfBuffer - tf2_ros buffer instance from which to lookup transforms from the 'tf' tree
