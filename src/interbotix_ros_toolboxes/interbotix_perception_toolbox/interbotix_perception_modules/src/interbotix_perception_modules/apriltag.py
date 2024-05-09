@@ -33,7 +33,6 @@ class InterbotixAprilTagInterface(object):
         camera_info_topic = rospy.get_param(
             "/" + apriltag_ns + "/camera_info_topic",
             default="camera/color/image_raw").strip("/")
-        print("TESTING", camera_info_topic)
         rospy.wait_for_service("/" + apriltag_ns + "/snap_picture")
         rospy.wait_for_service("/" + apriltag_ns + "/single_image_tag_detection")
         self.sub_camera_info = rospy.Subscriber("/" + camera_info_topic, CameraInfo, self.camera_info_cb)
@@ -107,8 +106,8 @@ class InterbotixAprilTagInterface(object):
         :return: list of tag detections
         :rtype: apriltag_ros/AprilTagDetectionArray
         """
-        return self.srv_snap_picture(self.request.full_path_where_to_get_image)
-        # return self.srv_analyze_image(self.request).tag_detections
+        self.srv_snap_picture(self.request.full_path_where_to_get_image)
+        return self.srv_analyze_image(self.request).tag_detections
 
     def set_valid_tags(self, ids):
         """Setter for list of valid tags
