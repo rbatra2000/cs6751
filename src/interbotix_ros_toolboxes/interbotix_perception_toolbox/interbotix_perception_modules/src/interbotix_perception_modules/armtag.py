@@ -39,6 +39,8 @@ class InterbotixArmTagInterface(object):
         if arm_base_frame == None:
             arm_base_frame = self.arm_base_frame
 
+        # print("TEST", ref_frame, arm_base_frame)
+
         # take the average pose (w.r.t. the camera frame) of the AprilTag over 'num_samples' samples
         point = Point()
         rpy = [0, 0, 0]
