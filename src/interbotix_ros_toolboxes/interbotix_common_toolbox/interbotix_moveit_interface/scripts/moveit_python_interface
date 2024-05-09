@@ -263,7 +263,8 @@ def main():
     print("============ Press `Enter` to execute arm tag detection ...")
     input()
     armtag = InterbotixArmTagInterface()
-    armtag.find_ref_to_arm_base_transform()
+    transform = armtag.find_ref_to_arm_base_transform(arm_base_frame='world')
+    print("TRANSFORM", transform)
 
     global vision_sub, vision_sub_done, blueberry_coordinates
     print("============ Press `Enter` to execute detection of a ripe blueberry ...")
@@ -276,8 +277,23 @@ def main():
     vision_sub_done.wait()
     # TODO(hang_ritik): apply transform
 
-    blueberry_coordinates = tuple(np.matmul(np.array([[0,0,1], [0,1,0], [-1,0,0]]), blueberry_coordinates))
-    print("transformed", blueberry_coordinates)
+    rs_coordinates = np.array([[blueberry_coordinates[0]], [blueberry_coordinates[1]], [blueberry_coordinates[2]], [1]])
+
+    # translational matrix
+    T = np.eye(4)
+    T[:3, 3] = transform.transform.translation
+
+    # rotational matrix
+    R = np.eye(4)
+    R[:3, :3] = transform.transform.rotation[:3, :3]
+
+    # apply it
+    robot_coords = np.dot(R, np.dot(T, rs_coordinates))
+    print("transformed", tuple(robot_coords))
+
+
+    # blueberry_coordinates = tuple(np.matmul(np.array([[0,0,1], [0,1,0], [-1,0,0]]), blueberry_coordinates))
+    # print("transformed", blueberry_coordinates)
 
     print("============ Press `Enter` to plan and execute a path to pick a box ...")
     input()
