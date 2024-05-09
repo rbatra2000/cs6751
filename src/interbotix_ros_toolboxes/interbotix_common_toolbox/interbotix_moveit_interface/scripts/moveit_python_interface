@@ -7,9 +7,12 @@ import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
+import tf2_ros
+from interbotix_common_modules import angle_manipulation as ang
+
 from math import radians, pi
 from moveit_msgs.msg import DisplayTrajectory, Constraints, OrientationConstraint
-from geometry_msgs.msg import Quaternion, Pose
+from geometry_msgs.msg import Quaternion, PointStamped
 from std_msgs.msg import String
 import threading
 import json
@@ -263,8 +266,8 @@ def main():
     print("============ Press `Enter` to execute arm tag detection ...")
     input()
     armtag = InterbotixArmTagInterface()
-    transform = armtag.find_ref_to_arm_base_transform(arm_base_frame='world')
-    print("TRANSFORM", transform)
+    trans = armtag.find_ref_to_arm_base_transform(arm_base_frame='world')
+    print("TRANSFORM", trans)
 
     global vision_sub, vision_sub_done, blueberry_coordinates
     print("============ Press `Enter` to execute detection of a ripe blueberry ...")
@@ -277,19 +280,58 @@ def main():
     vision_sub_done.wait()
     # TODO(hang_ritik): apply transform
 
-    rs_coordinates = np.array([[blueberry_coordinates[0]], [blueberry_coordinates[1]], [blueberry_coordinates[2]], [1]])
+    # Get the transform from the 'ref_frame' to the cluster frame (i.e. the camera's depth frame) - known as T_rc
+    x = trans.transform.translation.x
+    y = trans.transform.translation.y
+    z = trans.transform.translation.z
+    quat = trans.transform.rotation
+    q = [quat.x, quat.y, quat.z, quat.w]
+    rpy = euler_from_quaternion(q)
+    T_rc = ang.poseToTransformationMatrix([x, y, z, rpy[0], rpy[1], rpy[2]])
 
-    # translational matrix
-    T = np.eye(4)
-    T[:3, 3] = transform.transform.translation
+    # p_co is the cluster's position w.r.t. the camera's depth frame
+    # p_ro is the cluster's position w.r.t. the desired reference frame
+    p_co = [blueberry_coordinates[2], blueberry_coordinates[1], blueberry_coordinates[0], 1]
+    # p_co = [blueberry_coordinates[0], blueberry_coordinates[1], blueberry_coordinates[2], 1]
 
-    # rotational matrix
-    R = np.eye(4)
-    R[:3, :3] = transform.transform.rotation[:3, :3]
+    p_ro = np.dot(T_rc, p_co)
 
-    # apply it
-    robot_coords = np.dot(R, np.dot(T, rs_coordinates))
-    print("transformed", tuple(robot_coords))
+    # make sure we dont hit the wall
+    p_ro[0] = min(p_ro[0], 0.2)
+
+    # # p_comin is the minimum point of the cluster (in the 'z' direction) w.r.t. the camera's depth frame;
+    # # it is assumed that this point lies at the top or very near the top of the cluster
+    # # p_romin is the same point w.r.t. the desired reference frame; the 'z' element of this point replaces
+    # # the 'z' element in p_ro; thus, a tf frame published at this point should appear at the 'top-center' of the cluster
+    # p_comin = [p_co.x, p_co.y, p_co.z, 1]
+    # p_romin = np.dot(T_rc, p_comin)
+    # p_ro[2] = p_romin[2]
+    # cluster.position.x = p_ro[0]
+    # cluster.position.y = p_ro[1]
+    # cluster.position.z = p_ro[2]
+    # blueb = do_transform_point(point_stamped, transform).point
+    new_coord = tuple(p_ro)
+
+
+
+    # rs_coordinates = np.array([[blueberry_coordinates[0]], [blueberry_coordinates[1]], [blueberry_coordinates[2]], [1]])
+
+    # # translational matrix
+    # T = np.eye(4)
+    # T[:3, 3] = transform.transform.translation
+
+    # # rotational matrix
+    # R = np.eye(4)
+    # R[:3, :3] = transform.transform.rotation[:3, :3]
+
+    # # apply it
+    # robot_coords = np.dot(R, np.dot(T, rs_coordinates))
+
+    print("transformed", new_coord)
+    # the new coord SHOULD be (0.2, 0.2, 0.5) [x,y,z]
+    # new_coord = (0.2, 0.2, 0.5)
+
+    # new_coord = (0.23123332058381857, 0.4690372339033566, -0.6478854407314814)
 
 
     # blueberry_coordinates = tuple(np.matmul(np.array([[0,0,1], [0,1,0], [-1,0,0]]), blueberry_coordinates))
@@ -300,7 +342,7 @@ def main():
     input()
 
     # plan, fraction = tutorial.plan_cartesian_path_to_pick_box()
-    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=blueberry_coordinates)
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=new_coord)
     if fraction > 0.75:
         tutorial.execute_plan(plan)
     else:
