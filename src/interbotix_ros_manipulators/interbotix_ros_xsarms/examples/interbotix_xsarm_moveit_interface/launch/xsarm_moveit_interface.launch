@@ -3,7 +3,7 @@
   <arg name="robot_model"                       default=""/>
   <arg name="robot_name"                        default="$(arg robot_model)"/>
   <arg name="base_link_frame"                   default="base_link"/>
-  <arg name="show_ar_tag"                       default="false"/>
+  <arg name="show_ar_tag"                       default="true"/>
   <arg name="use_world_frame"                   default="true"/>
   <arg name="external_urdf_loc"                 default=""/>
   <arg name="external_srdf_loc"                 default=""/>
@@ -11,13 +11,63 @@
   <arg name="use_moveit_rviz"                   default="true"/>
   <arg name="rviz_frame"                        default="world"/>
   <arg name="use_gazebo"                        default="false"/>
-  <arg name="use_actual"                        default="false"/>
+  <arg name="use_actual"                        default="true"/>
   <arg name="use_fake"                          default="false"/>
   <arg name="dof"                               default="5"/>
   <arg name="world_name"                        default="$(find interbotix_xsarm_gazebo)/worlds/xsarm_gazebo.world"/>
   <arg name="use_cpp_interface"                 default="false"/>
   <arg name="moveit_interface_gui"              default="true"/>
-  <arg name="use_python_interface"              default="false"/>
+  <arg name="use_python_interface"              default="true"/>
+
+  <!-- Perception -->
+  <arg name="filters"                           default="pointcloud"/>
+  <arg name="color_fps"                         default="30"/>
+  <arg name="color_width"                       default="640"/>
+  <arg name="color_height"                      default="480"/>
+  <arg name="depth_fps"                         default="30"/>
+  <arg name="depth_width"                       default="640"/>
+  <arg name="depth_height"                      default="480"/>
+  <arg name="camera_color_topic"                default="camera/color/image_raw"/>
+  <arg name="camera_info_topic"                 default="camera/color/camera_info"/>
+  <arg name="apriltag_ns"                       default="apriltag"/>
+  <arg name="armtag_ns"                         default="armtag"/>
+  <arg name="camera_frame"                      default="camera_color_optical_frame"/>
+  <arg name="ref_frame"                         default="$(arg camera_frame)"/>
+  <arg name="use_armtag_tuner_gui"              default="false"/>
+  <arg name="position_only"                     default="false"/>
+  <arg name="arm_base_frame"                    default="$(arg robot_name)/$(arg base_link_frame)"/>
+  <arg name="arm_tag_frame"                     default="$(arg robot_name)/ar_tag_link"/>
+  <arg name="tag_family"                        default="tagStandard41h12"/>
+  <arg name="standalone_tags"                   default="$(find interbotix_perception_modules)/config/tags.yaml"/>
+
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="filters"                           value="$(arg filters)"/>
+    <arg name="color_fps"                         value="$(arg color_fps)"/>
+    <arg name="color_width"                       value="$(arg color_width)"/>
+    <arg name="color_height"                      value="$(arg color_height)"/>
+    <arg name="depth_fps"                         value="$(arg depth_fps)"/>
+    <arg name="depth_width"                       value="$(arg depth_width)"/>
+    <arg name="depth_height"                      value="$(arg depth_height)"/>
+    <arg name="align_depth"                       value="true"/>
+  </include>
+
+  <include file="$(find interbotix_perception_modules)/launch/armtag.launch">
+    <arg name="tag_family"                        value="$(arg tag_family)"/>
+    <arg name="standalone_tags"                   value="$(arg standalone_tags)"/>
+    <arg name="camera_frame"                      value="$(arg camera_frame)"/>
+    <arg name="apriltag_ns"                       value="$(arg apriltag_ns)"/>
+    <arg name="camera_color_topic"                value="$(arg camera_color_topic)"/>
+    <arg name="camera_info_topic"                 value="$(arg camera_info_topic)"/>
+    <arg name="armtag_ns"                         value="$(arg armtag_ns)"/>
+    <arg name="ref_frame"                         value="$(arg ref_frame)"/>
+    <arg name="arm_base_frame"                    value="$(arg arm_base_frame)"/>
+    <arg name="arm_tag_frame"                     value="$(arg arm_tag_frame)"/>
+    <arg name="use_armtag_tuner_gui"              value="$(arg use_armtag_tuner_gui)"/>
+    <arg name="position_only"                     value="$(arg position_only)"/>
+  </include>
+
+  <!-- Perception -->
+
 
   <include file="$(find interbotix_xsarm_moveit)/launch/xsarm_moveit.launch">
     <arg name="robot_model"                       value="$(arg robot_model)"/>

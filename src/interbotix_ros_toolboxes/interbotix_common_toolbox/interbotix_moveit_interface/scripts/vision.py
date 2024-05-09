@@ -5,6 +5,7 @@ import time
 import cv2
 from threading import Lock
 import sys
+from std_msgs.msg import String
 
 # ros imports
 import message_filters
@@ -29,108 +30,80 @@ class PixelSelector:
             return False
         return True
 
-    def get_blueberries_coordinates(self, event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDBLCLK:
+    def get_blueberries_coordinates(self):
+        # get locations of blueberries
+        blueberries = []
+        # image = bridge.imgmsg_to_cv2(img_msg, "passthrough")
+        # show_image(cv_image)
 
-            # get locations of blueberries
-            # image = bridge.imgmsg_to_cv2(img_msg, "passthrough")
-            # show_image(cv_image)
+        frame = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
+        # cv2.imshow('frame', frame)
+        # cv2.waitKey()
 
-            frame = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
-            # cv2.imshow('frame', frame)
-            # cv2.waitKey()
+        # TODO: this is actually orange l o l
+        lower_blue = np.array([10,100,20])
+        upper_blue = np.array([25,255,255])
 
-            # TODO: this is actually orange l o l
-            lower_blue = np.array([10,100,20])
-            upper_blue = np.array([25,255,255])
+        mask = cv2.inRange(frame, lower_blue, upper_blue)
+        # cv2.imshow('frame', mask)
+        # cv2.waitKey()
 
-            mask = cv2.inRange(frame, lower_blue, upper_blue)
-            # cv2.imshow('frame', mask)
-            # cv2.waitKey()
-    
-            # okay now lets create contours so we can identify the blue objects
-            bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+        # okay now lets create contours so we can identify the blue objects
+        bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-            if len(bluecnts) > 0:
-                 for cnt in bluecnts:
-                    area =cv2.contourArea(cnt)
+        if len(bluecnts) > 0:
+            for cnt in bluecnts:
+                area =cv2.contourArea(cnt)
+
+                # we are adding a threshold to make sure that we have valid blueberries
+                # TODO: this is arbitrary for now but we can change
+                if area < MIN_BLUEB_AREA:
+                    print("Skipped blueberry due to small area")
+                    continue
+                #   print(area)
+                (xg,yg,wg,hg) = cv2.boundingRect(cnt)
+                center_x, center_y= ((int)(xg+wg/2), (int)(yg+hg/2))
+                cv2.rectangle(self.img,(xg,yg), (xg+wg, yg+hg), (255,0,0), 2)
+
+                # cv2.circle(image, ((int)(xg+wg/2), (int)(yg+hg/2)), 2, (0, 255, 0), 2)
+                blueberries.append([center_x,center_y])
+                cv2.circle(self.img, (center_x,center_y), 1, (0, 0, 255), -1)
+
+                # TODO: here let's try to see if we can figure out if the occlusion is on the right or left
+
+                # here are green ranges
+                lower_green = np.array([25,50,50])
+                upper_green = np.array([90,255,255])
+
+                # create green mask this time
+                green_mask = cv2.inRange(frame.copy(), lower_green, upper_green)
+
+                # get contours to separate the leaves
+                greencnts = cv2.findContours(green_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+
+                # see if the bounding box of any leaves are overlapping with the blueberry
+                for gCnt in greencnts:
+                    (xl, yl, wl, hl) = cv2.boundingRect(gCnt)
+                    area =cv2.contourArea(gCnt)
 
                     # we are adding a threshold to make sure that we have valid blueberries
                     # TODO: this is arbitrary for now but we can change
-                    if area < MIN_BLUEB_AREA:
-                        print("Skipped blueberry due to small area")
+                    if area < MIN_LEAF_AREA:
                         continue
-                    #   print(area)
-                    (xg,yg,wg,hg) = cv2.boundingRect(cnt)
-                    center_x, center_y= ((int)(xg+wg/2), (int)(yg+hg/2))
-                    cv2.rectangle(self.img,(xg,yg), (xg+wg, yg+hg), (255,0,0), 2)
 
-                    # cv2.circle(image, ((int)(xg+wg/2), (int)(yg+hg/2)), 2, (0, 255, 0), 2)
-                    self.clicks.append([center_x,center_y])
-                    cv2.circle(self.img, (center_x,center_y), 1, (0, 0, 255), -1)
+                    if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
+                        cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
+                        leaf_x, leaf_y = ((int)(xl+wl/2), (int)(yl+hl/2))
+                        if leaf_x < center_x:
+                            print("Leaf is on left")
+                        else:
+                            print("Leaf is on right")
+        return blueberries
 
-                    # TODO: here let's try to see if we can figure out if the occlusion is on the right or left
-
-                    # here are green ranges
-                    lower_green = np.array([25,50,50])
-                    upper_green = np.array([90,255,255])
-
-                    # create green mask this time
-                    green_mask = cv2.inRange(frame.copy(), lower_green, upper_green)
-
-                    # get contours to separate the leaves
-                    greencnts = cv2.findContours(green_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-
-                    # see if the bounding box of any leaves are overlapping with the blueberry
-                    for gCnt in greencnts:
-                        (xl, yl, wl, hl) = cv2.boundingRect(gCnt)
-                        area =cv2.contourArea(gCnt)
-
-                        # we are adding a threshold to make sure that we have valid blueberries
-                        # TODO: this is arbitrary for now but we can change
-                        if area < MIN_LEAF_AREA:
-                            continue
-
-                        if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
-                            cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
-                            leaf_x, leaf_y = ((int)(xl+wl/2), (int)(yl+hl/2))
-                            if leaf_x < center_x:
-                                print("Leaf is on left")
-                            else:
-                                print("Leaf is on right")
-
-                    # cv2.imshow('left mask', green_mask)
-                    # cv2.waitKey()
-                    
-
-                    # check if 
-
-
-
-            cv2.imshow("pixel_selector", self.img)
-
-    def mouse_callback(self, event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDBLCLK:
-            # get image and get the locations of the blueberries
-
-            self.clicks.append([x, y])
-            cv2.circle(self.img, (x, y), 10, (200, 0, 0), -1)
-            cv2.imshow("pixel_selector", self.img)
-
-    def run(self, img, num_clicks=1):
+    def run(self, img):
         self.load_image(img)
-        self.clicks = []
-        cv2.namedWindow('pixel_selector')
-        cv2.setMouseCallback('pixel_selector', self.get_blueberries_coordinates)
-        while True:
-            cv2.imshow("pixel_selector", self.img)
-            k = cv2.waitKey(20) & 0xFF
-            if k == 27:  # Escape key
-                break
-            if len(self.clicks) >= num_clicks:
-                break
-        return self.clicks
-
+        return self.get_blueberries_coordinates()
+    
 class RealSenseROS:
 
     def __init__(self):
@@ -264,20 +237,17 @@ class RealSenseROS:
 
         self.point_visualization_pub.publish(marker_array)
 
-if __name__ == "__main__":
+def realsense_node():
     rospy.init_node('RealSenseROS')
     rs_ros = RealSenseROS()
     pixel_selector = PixelSelector()
-    
-    while True:    
+
+    pub = rospy.Publisher('/realsense', String, queue_size=10)
+    rate = rospy.Rate(1)
+    while not rospy.is_shutdown():    
 
         header, color_data, info_data, depth_data = rs_ros.get_camera_data()   
-
-        # TODO: if there are no pixels, break program or something
-
         pixel = pixel_selector.run(color_data)
-        if len(pixel) == 0:
-            break
         print("Pixel: ",pixel)
 
 
@@ -289,9 +259,16 @@ if __name__ == "__main__":
                 point_transform[:3,3] = world_coordinate.reshape(1,3)
             
                 rs_ros.visualize_point(point_transform)
+                world_coordinate = str(list(world_coordinate))
+                pub.publish(world_coordinate)
                 print("World Coordinate: ", world_coordinate)
             else:
-                print("Pixel selected has invalid depth :(")
+                rospy.loginfo("Pixel selected has invalid depth :(")
 
-        input("Press [ENTER] to move to try again ...")
-        cv2.destroyAllWindows()
+        rate.sleep()
+
+if __name__ == "__main__":
+    try:
+        realsense_node()
+    except rospy.ROSInterruptException:
+        pass

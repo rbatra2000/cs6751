@@ -10,6 +10,16 @@ from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from math import radians, pi
 from moveit_msgs.msg import DisplayTrajectory, Constraints, OrientationConstraint
 from geometry_msgs.msg import Quaternion, Pose
+from std_msgs.msg import String
+import threading
+import json
+from interbotix_perception_modules.armtag import InterbotixArmTagInterface
+import numpy as np
+
+vision_sub_done = threading.Event()
+vision_sub = None
+blueberry_coordinates = (0.3, 0.05, 0.25)
+# Realsense coordinates: (-0.016401219467957737, -0.045152758531781134, 0.9620000000000001)
 
 
 class MoveGroupPythonInterfaceTutorial(object):
@@ -72,7 +82,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.stop()
 
         current_joints = self.arm_group.get_current_joint_values()
-        return all_close(self.joint_goal, current_joints, 0.01)
+        return self.all_close(self.joint_goal, current_joints, 0.01)
     
     def gripper_open(self):
         """Open the gripper using predefined joint values."""
@@ -182,8 +192,14 @@ class MoveGroupPythonInterfaceTutorial(object):
         # Execute the trajectory
         self.arm_group.execute(plan, wait=True)
     
+    def go_to_armtag_position(self):
+        home_position = [0, -1, 1, 0, -1.5, 0]  # Example values
+        self.arm_group.go(home_position, wait=True)
+        rospy.sleep(1)  # Allow time for the robot to stabilize
+        self.arm_group.stop()  # Ensure no residual movement
+
     def go_to_home_position(self):
-        home_position = [0, 0, 0, 0, 0, 0]  # Example values
+        home_position = [0, 0, 0, 0, 0]  # Example values
         self.arm_group.go(home_position, wait=True)
         rospy.sleep(1)  # Allow time for the robot to stabilize
         self.arm_group.stop()  # Ensure no residual movement
@@ -225,26 +241,49 @@ class MoveGroupPythonInterfaceTutorial(object):
         return plan_success
 
 
+def read_vision_callback(data):
+    global blueberry_coordinates
+    received = json.loads(data.data)
 
-
-
+    # TODO: add a little bit of buffer so we're going to adjust the depth a little less
+    # received[2] -= 0.1
+    blueberry_coordinates = received
+    print(blueberry_coordinates)
+    vision_sub.unregister()
+    vision_sub_done.set()
 
 def main():
     tutorial = MoveGroupPythonInterfaceTutorial()
     print("============ Press `Enter` to begin the tutorial by setting up the moveit_commander (press ctrl-d to exit) ...")
     input()
-    tutorial.go_to_home_position()
+    tutorial.go_to_armtag_position()
     # tutorial.add_box()
 
-
     # TODO(ritikbatra): This is where Ritik will add CV stuff (comment out if doing other testing)
-    # print("============ Press `Enter` to execute a movement towards a ripe blueberry ...")
-    # input()
+    print("============ Press `Enter` to execute arm tag detection ...")
+    input()
+    armtag = InterbotixArmTagInterface()
+    armtag.find_ref_to_arm_base_transform()
 
+    global vision_sub, vision_sub_done, blueberry_coordinates
+    print("============ Press `Enter` to execute detection of a ripe blueberry ...")
+    input()
+
+    # We are going to first take a snapshot of the camera and determine the location of a _single_ blueberry
+    # (we can expand to make this whole thing a for loop later)
+    vision_sub = rospy.Subscriber('/realsense', String, read_vision_callback)
+
+    vision_sub_done.wait()
+    # TODO(hang_ritik): apply transform
+
+    blueberry_coordinates = tuple(np.matmul(np.array([[0,0,1], [0,1,0], [-1,0,0]]), blueberry_coordinates))
+    print("transformed", blueberry_coordinates)
 
     print("============ Press `Enter` to plan and execute a path to pick a box ...")
     input()
-    plan, fraction = tutorial.plan_cartesian_path_to_pick_box()
+
+    # plan, fraction = tutorial.plan_cartesian_path_to_pick_box()
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=blueberry_coordinates)
     if fraction > 0.75:
         tutorial.execute_plan(plan)
     else:
