@@ -116,7 +116,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.scene.remove_world_object(self.box_name)
         self.wait_for_state_update(box_is_known=False, timeout=timeout)
 
-    def plan_cartesian_path_to_pick_box(self, object_ee_goal=(0.3, 0.05, 0.25),bias_angle = radians(30)):
+    def plan_cartesian_path_to_pick_box(self, object_ee_goal=(0.40, 0.03, 0.3),bias_angle = radians(30)):
         # Increase planning time
         self.arm_group.set_planning_time(10.0)
 
@@ -189,7 +189,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.stop()  # Ensure no residual movement
     
     
-    def rotate_wrist_joint(self, rotation_degrees=-45):
+    def rotate_wrist_joint(self, rotation_degrees=-90):
         # Convert degrees to radians
         rotation_radians = radians(rotation_degrees)
 
@@ -233,6 +233,7 @@ def main():
     tutorial = MoveGroupPythonInterfaceTutorial()
     print("============ Press `Enter` to begin the tutorial by setting up the moveit_commander (press ctrl-d to exit) ...")
     input()
+    tutorial.gripper_open()
     tutorial.go_to_home_position()
     # tutorial.add_box()
 
@@ -240,6 +241,7 @@ def main():
     # TODO(ritikbatra): This is where Ritik will add CV stuff (comment out if doing other testing)
     # print("============ Press `Enter` to execute a movement towards a ripe blueberry ...")
     # input()
+
 
 
     print("============ Press `Enter` to plan and execute a path to pick a box ...")
@@ -256,16 +258,16 @@ def main():
     # tutorial.detach_box()
     # tutorial.remove_box()
 
-    tutorial.gripper_open()
+
     # Assume some operations here...
-    print("Gripper opened. Press `Enter` to close.")
+    print("Press `Enter` to close Gripper .")
     input()
     tutorial.gripper_close()
     print("Gripper closed. Exiting.")
 
     print("Press `Enter` to rotate the wrist joint by 45 degrees...")
     input()
-    if tutorial.rotate_wrist_joint(-45):
+    if tutorial.rotate_wrist_joint(-90):
         print("Wrist rotation completed successfully!")
     else:
         print("Failed to rotate the wrist joint.")
@@ -276,6 +278,8 @@ def main():
         print("The robot is now in the 'Sleep' pose.")
     else:
         print("Failed to move the robot to the 'Sleep' pose.")
+
+    tutorial.gripper_open()
 
     rospy.spin()
     
