@@ -41,8 +41,8 @@ class PixelSelector:
             # cv2.waitKey()
 
             # TODO: this is actually orange l o l
-            lower_blue = np.array([10,100,20])
-            upper_blue = np.array([25,255,255])
+            lower_blue = np.array([110,50,50])
+            upper_blue = np.array([130,255,255])
 
             mask = cv2.inRange(frame, lower_blue, upper_blue)
             # cv2.imshow('frame', mask)

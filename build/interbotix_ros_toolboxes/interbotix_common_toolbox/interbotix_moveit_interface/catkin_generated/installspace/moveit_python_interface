@@ -3,456 +3,387 @@
 import sys
 import copy
 import rospy
-import random
 import moveit_commander
-import moveit_msgs.msg
 import geometry_msgs.msg
-from math import pi
-from six.moves import input
-from std_msgs.msg import String
 from tf.transformations import quaternion_from_euler
-from interbotix_xs_modules.arm import InterbotixManipulatorXS
-from moveit_commander.conversions import pose_to_list
-from shape_msgs.msg import SolidPrimitive
+import tf2_ros
+from interbotix_common_modules import angle_manipulation as ang
 
-def all_close(goal, actual, tolerance):
-  """
-  Convenience method for testing if a list of values are within a tolerance of their counterparts in another list
-  @param: goal       A list of floats, a Pose or a PoseStamped
-  @param: actual     A list of floats, a Pose or a PoseStamped
-  @param: tolerance  A float
-  @returns: bool
-  """
-  all_equal = True
-  if type(goal) is list:
-    for index in range(len(goal)):
-      if abs(actual[index] - goal[index]) > tolerance:
-        return False
+from math import radians
+from moveit_msgs.msg import DisplayTrajectory, OrientationConstraint
+from geometry_msgs.msg import Quaternion, TransformStamped, Pose
+from std_msgs.msg import String
+import threading
+import json
+from interbotix_perception_modules.armtag import InterbotixArmTagInterface
+import numpy as np
+from scipy.spatial.transform import Rotation
 
-  elif type(goal) is geometry_msgs.msg.PoseStamped:
-    return all_close(goal.pose, actual.pose, tolerance)
+vision_sub_done = threading.Event()
+vision_sub = None
+blueberry_coordinates = (0.3, 0.05, 0.25)
 
-  elif type(goal) is geometry_msgs.msg.Pose:
-    return all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
-
-  return True
-
-class MoveGroupPythonIntefaceTutorial(object):
-  """MoveGroupPythonIntefaceTutorial"""
-  def __init__(self):
-    super(MoveGroupPythonIntefaceTutorial, self).__init__()
-    ## BEGIN_SUB_TUTORIAL setup
-    ##
-    ## First initialize `moveit_commander`_ and a `rospy`_ node:
-    moveit_commander.roscpp_initialize(sys.argv)
-    rospy.init_node('moveit_python_interface')
-
-    ## Get the name of the robot - this will be used to properly define the end-effector link when adding a box
-    self.robot_model = rospy.get_param("~robot_model")
-    self.robot_name = rospy.get_namespace().strip("/")
-    self.ee_link_offset = rospy.get_param("~ee_link_offset")
-    self.joint_goal = rospy.get_param("~joint_goal")
-    pose_goal_raw = rospy.get_param("~pose_goal")
-    quat = quaternion_from_euler(pose_goal_raw[3], pose_goal_raw[4], pose_goal_raw[5])
-    self.pose_goal = geometry_msgs.msg.Pose()
-    self.pose_goal.position.x = pose_goal_raw[0]
-    self.pose_goal.position.y = pose_goal_raw[1]
-    self.pose_goal.position.z = pose_goal_raw[2]
-    self.pose_goal.orientation.x = quat[0]
-    self.pose_goal.orientation.y = quat[1]
-    self.pose_goal.orientation.z = quat[2]
-    self.pose_goal.orientation.w = quat[3]
-
-
-    ## Instantiate a `RobotCommander`_ object. This object is the outer-level interface to
-    ## the robot:
-    self.robot = moveit_commander.RobotCommander()
-
-    ## Instantiate a `PlanningSceneInterface`_ object.  This object is an interface
-    ## to the world surrounding the robot:
-    self.scene = moveit_commander.PlanningSceneInterface()
-
-    ## Instantiate a `MoveGroupCommander`_ object.  This object is an interface
-    ## to one group of joints.  In this case the group is the joints in the Interbotix
-    ## arm so we set ``group_name = interbotix_arm``. If you are using a different robot,
-    ## you should change this value to the name of your robot arm planning group.
-    ## This interface can be used to plan and execute motions on the Interbotix Arm:
-    group_name = "interbotix_arm"
-    self.group = moveit_commander.MoveGroupCommander(group_name)
-
-    ## We create a `DisplayTrajectory`_ publisher which is used later to publish
-    ## trajectories for RViz to visualize:
-    self.display_trajectory_publisher = rospy.Publisher("move_group/display_planned_path",
-                                                   moveit_msgs.msg.DisplayTrajectory,
-                                                   queue_size=20)
-
-    ## Getting Basic Information
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^^
-    # We can get the name of the reference frame for this robot:
-    self.planning_frame = self.group.get_planning_frame()
-    print("============ Reference frame: %s" % self.planning_frame)
-
-    # We can also print the name of the end-effector link for this group:
-    self.eef_link = self.group.get_end_effector_link()
-    print("============ End effector: %s" % self.eef_link)
-
-    # We can get a list of all the groups in the robot:
-    self.group_names = self.robot.get_group_names()
-    print("============ Robot Groups: " + str(self.group_names))
-    self.add_collision_object()  # Ensure this is called after planning_frame is initialized
+class TFUtils:
+    def __init__(self):
+        self.tfBuffer = tf2_ros.Buffer() # Using default cache time of 10 secs
+        self.listener = tf2_ros.TransformListener(self.tfBuffer)
+        self.broadcaster = tf2_ros.TransformBroadcaster()
+        self.control_rate = rospy.Rate(100)
     
-    # Sometimes for debugging it is useful to print the entire state of the
-    # robot:
-    print("============ Printing robot state")
-    print(self.robot.get_current_state())
-    print("")
+    def getTransformationFromTF(self, source_frame, target_frame):
 
-  def go_to_joint_state(self):
-    ## Planning to a Joint Goal
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^
+        while not rospy.is_shutdown():
+            try:
+                # print("Looking for transform")
+                transform = self.tfBuffer.lookup_transform(source_frame, target_frame, rospy.Time())
+                break
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                self.control_rate.sleep()
+                continue
 
-    print("============ Printing Joint Goal: " + str(self.joint_goal))
+        T = np.zeros((4,4))
+        T[:3,:3] = Rotation.from_quat([transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w]).as_matrix()
+        T[:3,3] = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z]).reshape(1,3)
+        T[3,3] = 1
 
-    # The go command can be called with joint values, poses, or without any
-    # parameters if you have already set the pose or joint target for the group
-    self.group.go(self.joint_goal, wait=True)
+        print("Translation: ", T[:3,3])
+        print("Rotation in quaternion: ", transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w)
+        print("Rotation in euler: ", Rotation.from_quat([transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w]).as_euler('xyz', degrees=True))
 
-    # Calling ``stop()`` ensures that there is no residual movement
-    self.group.stop()
+        return T
+    
+    def publishTransformationToTF(self, source_frame, target_frame, transform):
 
-    current_joints = self.group.get_current_joint_values()
-    return all_close(self.joint_goal, current_joints, 0.01)
+        t = TransformStamped()
 
-  def go_to_pose_goal(self):
-    ## Planning to a Pose Goal
-    ## ^^^^^^^^^^^^^^^^^^^^^^^
-    ## We can plan a motion for this group to a desired pose for the
-    ## end-effector:
+        t.header.stamp = rospy.Time.now()
+        t.header.frame_id = source_frame
+        t.child_frame_id = target_frame
 
-    print("============ Printing Pose Goal:\n" + str(self.pose_goal))
-    self.group.set_pose_target(self.pose_goal)
+        t.transform.translation.x = transform.transform.translation.x
+        t.transform.translation.y = transform.transform.translation.y
+        t.transform.translation.z = transform.transform.translation.z
 
-    ## Now, we call the planner to compute the plan and execute it.
-    plan = self.group.go(wait=True)
-    # Calling `stop()` ensures that there is no residual movement
-    self.group.stop()
-    # It is always good to clear your targets after planning with poses.
-    # Note: there is no equivalent function for clear_joint_value_targets()
-    self.group.clear_pose_targets()
+        # R = Rotation.from_matrix(transform[:3,:3]).as_quat()
+        t.transform.rotation.x = transform.transform.rotation.x
+        t.transform.rotation.y = transform.transform.rotation.y
+        t.transform.rotation.z = transform.transform.rotation.z
+        t.transform.rotation.w = transform.transform.rotation.w
 
-    current_pose = self.group.get_current_pose().pose
-    return all_close(self.pose_goal, current_pose, 0.01)
+        self.broadcaster.sendTransform(t)
 
-  def plan_cartesian_path(self, x_dir=1, z_dir=1):
-    ## Cartesian Paths
-    ## ^^^^^^^^^^^^^^^
-    ## You can plan a Cartesian path directly by specifying a list of waypoints
-    ## for the end-effector to go through:
-    ##
-    waypoints = []
+    def get_pose_msg_from_transform(self, transform):
 
-    wpose = self.group.get_current_pose().pose
-    wpose.position.z += z_dir * 0.1  # First move up (z)
-    waypoints.append(copy.deepcopy(wpose))
+        pose = Pose()
+        pose.position.x = transform[0,3]
+        pose.position.y = transform[1,3]
+        pose.position.z = transform[2,3]
 
-    wpose.position.x += x_dir * 0.1  # Second move forward in (x)
-    waypoints.append(copy.deepcopy(wpose))
+        quat = Rotation.from_matrix(transform[:3,:3]).as_quat()
+        pose.orientation.x = quat[0]
+        pose.orientation.y = quat[1]
+        pose.orientation.z = quat[2]
+        pose.orientation.w = quat[3]
 
-    wpose.position.z -= z_dir * 0.1  # Third move down (z)
-    waypoints.append(copy.deepcopy(wpose))
+        return pose
 
-    # We want the Cartesian path to be interpolated at a resolution of 1 cm
-    # which is why we will specify 0.01 as the eef_step in Cartesian
-    # translation.  We will disable the jump threshold by setting it to 0.0 disabling:
-    (plan, fraction) = self.group.compute_cartesian_path(
-                                       waypoints,   # waypoints to follow
-                                       0.01,        # eef_step
-                                       0.0)         # jump_threshold
+class MoveGroupPythonInterfaceTutorial(object):
+    def __init__(self):
+        super(MoveGroupPythonInterfaceTutorial, self).__init__()
+        moveit_commander.roscpp_initialize(sys.argv)
+        rospy.init_node('moveit_python_interface')
 
-    # Note: We are just planning, not asking move_group to actually move the robot yet:
-    return plan, fraction
-  
- 
+        self.robot = moveit_commander.RobotCommander()
+        self.scene = moveit_commander.PlanningSceneInterface()
+        self.arm_group = moveit_commander.MoveGroupCommander("interbotix_arm")
+        self.gripper_group = moveit_commander.MoveGroupCommander("interbotix_gripper")  # Gripper control
+        self.display_trajectory_publisher = rospy.Publisher('move_group/display_planned_path',
+                                                            DisplayTrajectory,
+                                                            queue_size=20)
+
+        self.planning_frame = self.arm_group.get_planning_frame()
+        self.eef_link = self.arm_group.get_end_effector_link()
+        self.group_names = self.robot.get_group_names()
+        # Set the planner to RRTStar
+        self.set_planner('RRTstarkConfigDefault')
+        self.arm_group = moveit_commander.MoveGroupCommander("interbotix_arm")
+        self.arm_group.set_max_velocity_scaling_factor(0.5)  # Adjust as necessary
+        self.arm_group.set_max_acceleration_scaling_factor(0.5)  # Adjust as necessary
+        self.tfBuffer = tf2_ros.Buffer()
+        
+            
 
 
-  def display_trajectory(self, plan):
-    ## Displaying a Trajectory
-    ## ^^^^^^^^^^^^^^^^^^^^^^^
-    ## You can ask RViz to visualize a plan (aka trajectory) for you. But the
-    ## group.plan() method does this automatically so this is not that useful
-    ## here (it just displays the same trajectory again):
-    ##
-    ## A `DisplayTrajectory`_ msg has two primary fields, trajectory_start and trajectory.
-    ## We populate the trajectory_start with our current robot state to copy over
-    ## any AttachedCollisionObjects and add our plan to the trajectory.
-    display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-    display_trajectory.trajectory_start = self.robot.get_current_state()
-    display_trajectory.trajectory.append(plan)
-    # Publish
-    self.display_trajectory_publisher.publish(display_trajectory);
-
-  def execute_plan(self, plan):
-    ## Executing a Plan
-    ## ^^^^^^^^^^^^^^^^
-    ## Use execute if you would like the robot to follow
-    ## the plan that has already been computed:
-    self.group.execute(plan, wait=True)
-
-    ## **Note:** The robot's current joint state must be within some tolerance of the
-    ## first waypoint in the `RobotTrajectory`_ or ``execute()`` will fail
-
-  def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
-    ## Ensuring Collision Updates Are Receieved
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ## If the Python node dies before publishing a collision object update message, the message
-    ## could get lost and the box will not appear. To ensure that the updates are
-    ## made, we wait until we see the changes reflected in the
-    ## ``get_known_object_names()`` and ``get_known_object_names()`` lists.
-    ## For the purpose of this tutorial, we call this function after adding,
-    ## removing, attaching or detaching an object in the planning scene. We then wait
-    ## until the updates have been made or ``timeout`` seconds have passed
-    start = rospy.get_time()
-    seconds = rospy.get_time()
-    while (seconds - start < timeout) and not rospy.is_shutdown():
-      # Test if the box is in attached objects
-      attached_objects = self.scene.get_attached_objects([self.box_name])
-      is_attached = len(attached_objects.keys()) > 0
-
-      # Test if the box is in the scene.
-      # Note that attaching the box will remove it from known_objects
-      is_known = self.box_name in self.scene.get_known_object_names()
-      # Test if we are in the expected state
-      if (box_is_attached == is_attached) and (box_is_known == is_known):
+    def all_close(self, goal, actual, tolerance=0.01):
+        if type(goal) is list:
+            for index in range(len(goal)):
+                if abs(actual[index] - goal[index]) > tolerance:
+                    return False
+        elif type(goal) is geometry_msgs.msg.PoseStamped:
+            return self.all_close([goal.pose.position.x, goal.pose.position.y, goal.pose.position.z,
+                                   goal.pose.orientation.x, goal.pose.orientation.y, goal.pose.orientation.z, goal.pose.orientation.w],
+                                  [actual.pose.position.x, actual.pose.position.y, actual.pose.position.z,
+                                   actual.pose.orientation.x, actual.pose.orientation.y, actual.pose.orientation.z, actual.pose.orientation.w], tolerance)
+        elif type(goal) is geometry_msgs.msg.Pose:
+            return self.all_close([goal.position.x, goal.position.y, goal.position.z,
+                                   goal.orientation.x, goal.orientation.y, goal.orientation.z, goal.orientation.w],
+                                  [actual.position.x, actual.position.y, actual.position.z,
+                                   actual.orientation.x, actual.orientation.y, actual.orientation.z, actual.orientation.w], tolerance)
         return True
+    
+    def set_planner(self, planner_id):
+        """ Set the planner ID for planning """
+        self.arm_group.set_planner_id(planner_id)
 
-      # Sleep so that we give other threads time on the processor
-      rospy.sleep(0.1)
-      seconds = rospy.get_time()
+    def go_to_joint_state(self):
+        ## Planning to a Joint Goal
+        ## ^^^^^^^^^^^^^^^^^^^^^^^^
 
-    # If we exited the while loop without returning then we timed out
-    return False
+        print("============ Printing Joint Goal: " + str(self.joint_goal))
+
+        # The go command can be called with joint values, poses, or without any
+        # parameters if you have already set the pose or joint target for the group
+        self.arm_group.go(self.joint_goal, wait=True)
+
+        # Calling ``stop()`` ensures that there is no residual movement
+        self.arm_group.stop()
+
+        current_joints = self.arm_group.get_current_joint_values()
+        return self.all_close(self.joint_goal, current_joints, 0.01)
+    
+    def gripper_open(self):
+        """Open the gripper using predefined joint values."""
+        gripper_joint_values = [0.037, -0.037]  # Corresponds to the 'Open' state in SRDF
+        self.gripper_group.go(gripper_joint_values, wait=True)
+        self.gripper_group.stop()  # Ensure no residual movement
+
+    def gripper_close(self):
+        """Close the gripper using predefined joint values."""
+        gripper_joint_values = [0.015, -0.015]  # Corresponds to the 'Closed' state in SRDF
+        self.gripper_group.go(gripper_joint_values, wait=True)
+        self.gripper_group.stop()  # Ensure no residual movement
+
+    def add_box(self, object_ee_goal=(0.3, 0.05, 0.25),bias_angle = radians(30),timeout=4):
+        box_pose = geometry_msgs.msg.PoseStamped()
+        box_pose.header.frame_id = "world"
+        box_pose.pose.position.x = object_ee_goal[0]
+        box_pose.pose.position.y = object_ee_goal[1]
+        box_pose.pose.position.z = object_ee_goal[2]
+        quat = quaternion_from_euler(0, 0, bias_angle)  # 30 degrees Z
+        # Correctly assign quaternion values to a Quaternion message
+        box_pose.pose.orientation = Quaternion(*quat)
+
+        self.box_name = "box"
+        self.scene.add_box(self.box_name, box_pose, size=(0.02, 0.02, 0.02))
+        self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+    def attach_box(self, timeout=4):
+        grasping_group = 'interbotix_gripper'
+        touch_links = self.robot.get_link_names(group=grasping_group)
+        self.scene.attach_box(self.arm_group.get_end_effector_link(), self.box_name, touch_links=touch_links)
+        self.wait_for_state_update(box_is_attached=True, timeout=timeout)
+
+    def detach_box(self, timeout=4):
+        self.scene.remove_attached_object(self.arm_group.get_end_effector_link(), name=self.box_name)
+        self.wait_for_state_update(box_is_attached=False, timeout=timeout)
+
+    def remove_box(self, timeout=4):
+        self.scene.remove_world_object(self.box_name)
+        self.wait_for_state_update(box_is_known=False, timeout=timeout)
+
+    def plan_cartesian_path_to_pick_box(self, object_ee_goal=(0.40, 0.03, 0.3),bias_angle = radians(30)):
+        # Increase planning time
+        self.arm_group.set_planning_time(10.0)
+
+        waypoints = []
+        # Start with the current end-effector pose
+        start_pose = self.arm_group.get_current_pose().pose
+        waypoints.append(copy.deepcopy(start_pose))
+
+        # Create the goal pose directly without intermediate steps
+        goal_pose = copy.deepcopy(start_pose)
+        goal_pose.position.x = object_ee_goal[0]
+        goal_pose.position.y = object_ee_goal[1]
+        goal_pose.position.z = object_ee_goal[2]
+        quat = quaternion_from_euler(0, 0, bias_angle)  # 30 degrees rotation around Z
+        goal_pose.orientation = Quaternion(*quat)
+        waypoints.append(copy.deepcopy(goal_pose))
+
+        # Compute the Cartesian path
+        (plan, fraction) = self.arm_group.compute_cartesian_path(
+            waypoints,  # waypoints to follow
+            0.01,       # eef_step
+            0.0)        # jump_threshold - keep as zero for strict path following
+
+        # Clear any existing path constraints to avoid affecting other operations
+        rospy.loginfo("Trajectory details: %s", plan.joint_trajectory)
+        self.arm_group.clear_path_constraints()
+        rospy.sleep(1)  # Allow time for the robot to stabilize
+
+        return plan, fraction
+
+    def display_trajectory(self, plan):
+        display_trajectory = DisplayTrajectory()
+        display_trajectory.trajectory_start = self.robot.get_current_state()
+        display_trajectory.trajectory.append(plan)
+        self.display_trajectory_publisher.publish(display_trajectory)
+
+    def execute_plan(self, plan):
+        self.arm_group.execute(plan, wait=True)
+
+    def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
+        start_time = rospy.get_time()
+        current_time = rospy.get_time()
+        while (current_time - start_time < timeout) and not rospy.is_shutdown():
+            if box_is_known:
+                is_known = self.box_name in self.scene.get_known_object_names()
+                if is_known:
+                    return True
+            if box_is_attached:
+                is_attached = len(self.scene.get_attached_objects([self.box_name])) > 0
+                if is_attached:
+                    return True
+            rospy.sleep(0.1)
+            current_time = rospy.get_time()
+        return False
+    
+    def execute_plan(self, plan):
+        # Ensure increasing timestamps
+        last_time = 0.1  # start with a small offset if necessary
+        for point in plan.joint_trajectory.points:
+            point.time_from_start = rospy.Duration(last_time)
+            last_time += 0.1  # increment to ensure each step increases; adjust the increment as necessary
+        
+        # Execute the trajectory
+        self.arm_group.execute(plan, wait=True)
+    
+    def go_to_armtag_position(self):
+        home_position = [0, -1, 1, 0, -1.5, 0]  # Example values
+        self.arm_group.go(home_position, wait=True)
+        rospy.sleep(1)  # Allow time for the robot to stabilize
+        self.arm_group.stop()  # Ensure no residual movement
+
+    def go_to_home_position(self):
+        home_position = [0, 0, 0, 0, 0]  # Example values
+        self.arm_group.go(home_position, wait=True)
+        rospy.sleep(1)  # Allow time for the robot to stabilize
+        self.arm_group.stop()  # Ensure no residual movement
+    
+    
+    def rotate_wrist_joint(self, rotation_degrees=-90):
+        # Convert degrees to radians
+        rotation_radians = radians(rotation_degrees)
+
+        # Get the current joint values from the group
+        current_joint_values = self.arm_group.get_current_joint_values()
+
+        # Assuming the wrist joint is the last in the list of joints
+        # This index might need to be adjusted depending on the specific joint configuration
+        wrist_joint_index = -1  # Typically the last joint for wrist rotation
+
+        # Add the rotation to the current joint value of the wrist
+        current_joint_values[wrist_joint_index] += rotation_radians
+
+        # Set the new joint values as the target for the robot
+        self.arm_group.set_joint_value_target(current_joint_values)
+
+        # Plan and execute the trajectory
+        plan_success = self.arm_group.go(wait=True)
+        self.arm_group.stop()  # Ensure there's no residual movement
+        self.arm_group.clear_pose_targets()  # Clear targets after execution
+
+        return plan_success
+    
+    def go_to_sleep_pose(self):
+        # Set the target to the named "Sleep" pose as defined in the robot's SRDF
+        self.arm_group.set_named_target("Sleep")
+
+        # Plan and execute the motion
+        plan_success = self.arm_group.go(wait=True)
+        self.arm_group.stop()  # Ensure there's no residual movement
+        self.arm_group.clear_pose_targets()  # Clear targets after execution
+
+        return plan_success
 
 
+def read_vision_callback(data):
+    global blueberry_coordinates
+    received = json.loads(data.data)
 
-  def attach_box(self, timeout=4):
-    ## Attaching Objects to the Robot
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ## Next, we will attach the box to the Arm's wrist. Manipulating objects requires the
-    ## robot be able to touch them without the planning scene reporting the contact as a
-    ## collision. By adding link names to the ``touch_links`` array, we are telling the
-    ## planning scene to ignore collisions between those links and the box. For the Interbotix
-    ## robot, we set ``grasping_group = 'interbotix_gripper'``. If you are using a different robot,
-    ## you should change this value to the name of your end effector group name.
-    grasping_group = 'interbotix_gripper'
-    touch_links = self.robot.get_link_names(group=grasping_group)
-    self.scene.attach_box(self.eef_link, self.box_name, touch_links=touch_links)
-
-    # We wait for the planning scene to update.
-    return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)
-
-  def detach_box(self, timeout=4):
-    ## Detaching Objects from the Robot
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ## We can also detach and remove the object from the planning scene:
-    self.scene.remove_attached_object(self.eef_link, name=self.box_name)
-
-    # We wait for the planning scene to update.
-    return self.wait_for_state_update(box_is_known=True, box_is_attached=False, timeout=timeout)
-
-  def remove_box(self, timeout=4):
-    ## Removing Objects from the Planning Scene
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ## We can remove the box from the world.
-    self.scene.remove_world_object(self.box_name)
-
-    ## **Note:** The object must be detached before we can remove it from the world
-
-    # We wait for the planning scene to update.
-    return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
-
-  def add_box(self, timeout=4):
-    box_pose = geometry_msgs.msg.PoseStamped()
-    box_pose.header.frame_id = "world"  # Assuming 'world' is your fixed frame
-    box_pose.pose.position.x = 0.4
-    box_pose.pose.position.y = 0.0
-    box_pose.pose.position.z = 0.05   # Adding half the height of the box to position it correctly on the surface
-    box_pose.pose.orientation.w = 1.0
-    self.box_name = "box"
-    self.scene.add_box(self.box_name, box_pose, size=(0.05, 0.05, 0.1))
-    return self.wait_for_state_update(box_is_known=True, timeout=timeout)
-
-
-  def add_collision_object(self):
-    # Define the size and pose of the box
-    #box_size = (0.3, 0.05, 0.3)  # Dimensions of the box (width, depth, height)
-    box_size = (0.08, 0.08, 0.08)
-    box_pose = geometry_msgs.msg.PoseStamped()
-    box_pose.header.frame_id = "world" #self.planning_frame
-    box_pose.pose.orientation.w = 1.0
-    box_pose.pose.position.x = 0.2
-    box_pose.pose.position.y = 0.0
-    box_pose.pose.position.z = 0.1 + box_size[2] / 2  # Position at half the height to sit on the plane
-
-    # Use the correct method to add a box to the planning scene
-    self.scene.add_box("big_box1", box_pose, box_size)
-    rospy.sleep(1)  # Allow time for the addition to be processed
-
-
-  def attach_box(self, timeout=4):
-    # Name of the box for reference
-    box_name = self.box_name
-    # Name of the end effector (gripper) link
-    eef_link = self.group.get_end_effector_link()
-    # Name of the group used for grasping (check your robot's SRDF file for this)
-    grasping_group = 'interbotix_gripper'
-    # Touch links are the links of the robot that will come into contact with the box
-    # This usually includes the gripper and possibly parts of the arm
-    touch_links = self.robot.get_link_names(group=grasping_group)
-
-    # Attach the box to the end effector
-    self.scene.attach_box(eef_link, box_name, touch_links=touch_links)
-
-    # Wait for the update to be completed
-    return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)
-
-
-
-  def plan_cartesian_path_to_pick_box(self):
-    waypoints = []
-
-    # Start with the current pose
-    current_pose = self.group.get_current_pose().pose
-    # waypoints.append(copy.deepcopy(current_pose))
-
-    # Approach waypoint: Move directly above the center of the box
-    approach_pose = copy.deepcopy(current_pose)
-    approach_pose.position.x = 0.4  # Center of the box in X
-    approach_pose.position.y = 0.0  # Center of the box in Y
-    # Since the box's total height is 0.2 and it's base is at z=0.1 on the surface,
-    # the top of the box is at z=0.1 + 0.2 = 0.3. We approach above that point.
-    approach_pose.position.z = 0.1 + 0.0  # Above the box, considering the height and a safety margin
-    # Ensure the orientation is set to a valid quaternion if not already set
-    approach_pose.orientation.w = 1.0
-    waypoints.append(copy.deepcopy(approach_pose))
-    planning_time = 100  # Give more time for planning
-    self.group.set_planning_time(planning_time)
-    # Planning the Cartesian path
-    (plan, fraction) = self.group.compute_cartesian_path(
-                                       waypoints,   # waypoints to follow
-                                       0.001,        # eef_step: step size for interpolation
-                                       0.0)         # jump_threshold: disabled for smooth path
-
-    return plan, fraction
-  
-  def plan_cartesian_path_to_lift_box(self):
-    waypoints = []
-
-    # Start with the current pose
-    current_pose_1 = self.group.get_current_pose().pose
-    # waypoints.append(copy.deepcopy(current_pose_1))
-
-    # Approach waypoint: Move directly above the center of the box
-    retreat_pose = copy.deepcopy(current_pose_1)
-    retreat_pose.position.x = 0.4  # Center of the box in X
-    retreat_pose.position.y = 0.1  # Center of the box in Y
-    retreat_pose.position.z = 0.3  # Lift by 10cm, adjust based on your setup
-    waypoints.append(copy.deepcopy(retreat_pose))
-    planning_time = 100  # Give more time for planning
-    self.group.set_planning_time(planning_time)
-    # Planning the Cartesian path
-    (plan, fraction) = self.group.compute_cartesian_path(
-                                       waypoints,   # waypoints to follow
-                                       0.01,        # eef_step: step size for interpolation
-                                       0.0)         # jump_threshold: disabled for smooth path
-
-    return plan, fraction
-  
-
-  
-
-  def go_to_home_position(self):
-    # Define home position as a set of joint values
-    home_position = [0, 0, 0, 0, 0, 0]  # Example values; adjust to your robot's home configuration
-    self.group.go(home_position, wait=True)
-    self.group.stop()  # Ensure no residual movement
-
-  def open_gripper(self):
-    # Define home position as a set of joint values
-    self.robot.gripper.close()
-
-
-
-
-
-  
-  
-
-
-
-
+    # TODO: add a little bit of buffer so we're going to adjust the depth a little less
+    blueberry_coordinates = received
+    print(blueberry_coordinates)
+    vision_sub.unregister()
+    vision_sub_done.set()
+    
 def main():
-    # bot = InterbotixManipulatorXS("wx250s", "arm", "gripper")
-    # bot.dxl.robot_set_operating_modes("group", "arm", "pwm")
+    tutorial = MoveGroupPythonInterfaceTutorial()
     print("============ Press `Enter` to begin the tutorial by setting up the moveit_commander (press ctrl-d to exit) ...")
     input()
-    tutorial = MoveGroupPythonIntefaceTutorial()
+    tutorial.go_to_armtag_position()
+    utils = TFUtils()
 
-    print("============ Press `Enter` to execute a movement using a joint state goal ...")
+    global vision_sub, vision_sub_done, blueberry_coordinates
+    print("============ Press `Enter` to execute detection of a ripe blueberry ...")
     input()
-    tutorial.go_to_joint_state()
 
+    # We are going to first take a snapshot of the camera and determine the location of a _single_ blueberry
+    # (we can expand to make this whole thing a for loop later)
+    vision_sub = rospy.Subscriber('/realsense', String, read_vision_callback)
 
+    vision_sub_done.wait()
 
-    if "interbotix_gripper" in tutorial.group_names:
+    rpy = ang.rotationMatrixToEulerAngles(np.eye(3,3))
+    quat = quaternion_from_euler(rpy[0], rpy[1], rpy[2])
 
-        print("============ Press `Enter` to add a box to the planning scene ...")
-        input()
-        tutorial.add_box()
-        tutorial.add_collision_object()
+    blueberry =  TransformStamped()
+    blueberry.transform.translation.x = blueberry_coordinates[0]
+    blueberry.transform.translation.y = blueberry_coordinates[1]
+    blueberry.transform.translation.z = blueberry_coordinates[2]
+    blueberry.transform.rotation = Quaternion(quat[0], quat[1], quat[2], quat[3])
+    blueberry.header.frame_id = 'blueberry'
+    blueberry.child_frame_id = 'camera_color_optical_frame'
+    blueberry.header.stamp = rospy.Time.now()
 
-        print("============ Press `Enter` to plan and execute a path with pick a box ...")
-        input()
-        plan, fraction = tutorial.plan_cartesian_path_to_pick_box()
-        if fraction > 0.8:  # Check if a satisfactory fraction of the path was planned
-            print("Executing the pick plan...")
-            tutorial.execute_plan(plan)
-        else:
-            print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
-        
-        
-        tutorial.attach_box()
-        # tutorial.open_gripper()
+    utils.publishTransformationToTF('camera_color_optical_frame', 'blueberry', blueberry)
 
-        # print("Moving to the home position...")
-        # tutorial.go_to_home_position()
+    # # # apply it
+    transform_blueb_world = utils.getTransformationFromTF('world', 'blueberry')
+    new_coord = transform_blueb_world[:3, 3]
 
-        print("============ Press `Enter` to plan and execute a path with lifting a box ...")
-        input()
-        plan, fraction = tutorial.plan_cartesian_path_to_lift_box()
-        if fraction > 0.8:  # Check if a satisfactory fraction of the path was planned
-            print("Executing the pick plan...")
-            tutorial.execute_plan(plan)
-        else:
-            print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
+    print("============ Press `Enter` to plan and execute a path to pick a box ...")
+    input()
 
-        # tutorial.group.gripper.set_pressure(1)
-        # tutorial.group.gripper.close(2.0)
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=new_coord)
+    if fraction > 0.75:
+        tutorial.execute_plan(plan)
+    else:
+        print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
 
+    # Assume some operations here...
+    print("Press `Enter` to close Gripper .")
+    input()
+    tutorial.gripper_close()
+    print("Gripper closed. Exiting.")
 
+    print("Press `Enter` to rotate the wrist joint by 45 degrees...")
+    input()
+    if tutorial.rotate_wrist_joint(-90):
+        print("Wrist rotation completed successfully!")
+    else:
+        print("Failed to rotate the wrist joint.")
+       
+    print("Press `Enter` to move the robot to the 'Sleep' pose...")
+    input()
+    if tutorial.go_to_sleep_pose():
+        print("The robot is now in the 'Sleep' pose.")
+    else:
+        print("Failed to move the robot to the 'Sleep' pose.")
 
-        # cartesian_plan, fraction = tutorial.plan_cartesian_path(x_dir=-1)
-        # tutorial.execute_plan(cartesian_plan)
+    tutorial.gripper_open()
 
-        print("============ Press `Enter` to detach the box from the Interbotix robot ...")
-        input()
-        tutorial.detach_box()
-
-        print("============ Press `Enter` to remove the box from the planning scene ...")
-        input()
-        tutorial.remove_box()
-
-    print("============ Python tutorial demo complete!")
     rospy.spin()
+    
 
 if __name__ == '__main__':
-  main()
+    main()

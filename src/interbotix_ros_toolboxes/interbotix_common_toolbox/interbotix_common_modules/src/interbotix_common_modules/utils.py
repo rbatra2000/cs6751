@@ -128,6 +128,7 @@ class TFUtils:
         t.transform.rotation.z = R[2]
         t.transform.rotation.w = R[3]
 
+        print("PUBLISHED TRANSFORM: ", source_frame, " -> ", target_frame)
         self.broadcaster.sendTransform(t)
 
     def get_pose_msg_from_transform(self, transform):

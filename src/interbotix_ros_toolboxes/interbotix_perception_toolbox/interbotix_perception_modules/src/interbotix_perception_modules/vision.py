@@ -4,19 +4,23 @@ import rospy
 import time
 import cv2
 from threading import Lock
-import sys
-from std_msgs.msg import String
-
-# ros imports
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Pose
+from interbotix_common_modules.utils import TFUtils
 
-MIN_BLUEB_AREA = 100
+# ASSUMPTIONS: minimum grape and leaf area
+MIN_GRAPE_AREA = 150
 MIN_LEAF_AREA = 50
+
+class Grape:
+    def __init__(self, name, loc, obstruction):
+        self.name = name
+        self.loc = loc
+        self.obstruction = obstruction
 
 class PixelSelector:
     def __init__(self):
@@ -25,51 +29,43 @@ class PixelSelector:
     def load_image(self, img):
         self.img = img
 
+    # if the leaf is intersection with the grape, we can determine the occlusion
     def intersection(self,a,b):
         if a[0]+a[2] < b[0] or a[0] > b[0]+b[2] or a[1]+a[3] < b[1] or a[1]>b[1]+b[3]:
             return False
         return True
 
-    def get_blueberries_coordinates(self):
-        # get locations of blueberries
-        blueberries = []
-        # image = bridge.imgmsg_to_cv2(img_msg, "passthrough")
-        # show_image(cv_image)
+    # get the coordinates of the grapes
+    def get_grape_coordinates(self):
+        # get locations of grapes (Grape Objects)
+        grapes = []
 
         frame = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
-        # cv2.imshow('frame', frame)
-        # cv2.waitKey()
 
-        # TODO: this is actually orange l o l
-        lower_blue = np.array([10,100,20])
-        upper_blue = np.array([25,255,255])
+        # ASSUMPTIONS: Using blue color range instead of red for the grapes due to HSV color space
+        lower_red = np.array([110,50,50])
+        upper_red = np.array([130,255,255])
 
-        mask = cv2.inRange(frame, lower_blue, upper_blue)
-        # cv2.imshow('frame', mask)
-        # cv2.waitKey()
+        # create a mask for the red color
+        mask = cv2.inRange(frame, lower_red, upper_red)
 
-        # okay now lets create contours so we can identify the blue objects
-        bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+        # get contours of the red color
+        redCnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-        if len(bluecnts) > 0:
-            for cnt in bluecnts:
+        # counter of number of grape number
+        grapeNum = 0
+
+        if len(redCnts) > 0:
+            for cnt in redCnts:
                 area =cv2.contourArea(cnt)
 
-                # we are adding a threshold to make sure that we have valid blueberries
-                # TODO: this is arbitrary for now but we can change
-                if area < MIN_BLUEB_AREA:
-                    print("Skipped blueberry due to small area")
+                # we are adding a threshold to make sure that we have valid grapes
+                if area < MIN_GRAPE_AREA:
+                    print("Skipped grape due to small area")
                     continue
-                #   print(area)
+
                 (xg,yg,wg,hg) = cv2.boundingRect(cnt)
                 center_x, center_y= ((int)(xg+wg/2), (int)(yg+hg/2))
-                cv2.rectangle(self.img,(xg,yg), (xg+wg, yg+hg), (255,0,0), 2)
-
-                # cv2.circle(image, ((int)(xg+wg/2), (int)(yg+hg/2)), 2, (0, 255, 0), 2)
-                blueberries.append([center_x,center_y])
-                cv2.circle(self.img, (center_x,center_y), 1, (0, 0, 255), -1)
-
-                # TODO: here let's try to see if we can figure out if the occlusion is on the right or left
 
                 # here are green ranges
                 lower_green = np.array([25,50,50])
@@ -81,29 +77,36 @@ class PixelSelector:
                 # get contours to separate the leaves
                 greencnts = cv2.findContours(green_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-                # see if the bounding box of any leaves are overlapping with the blueberry
+                obstruction = ''
+                # see if the bounding box of any leaves are overlapping with the grape
                 for gCnt in greencnts:
                     (xl, yl, wl, hl) = cv2.boundingRect(gCnt)
                     area =cv2.contourArea(gCnt)
 
-                    # we are adding a threshold to make sure that we have valid blueberries
-                    # TODO: this is arbitrary for now but we can change
+                    # we are adding a threshold to make sure that we have valid grapes
                     if area < MIN_LEAF_AREA:
                         continue
 
                     if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
                         cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
-                        leaf_x, leaf_y = ((int)(xl+wl/2), (int)(yl+hl/2))
+                        leaf_x, _ = ((int)(xl+wl/2), (int)(yl+hl/2))
                         if leaf_x < center_x:
-                            print("Leaf is on left")
+                            obstruction = 'l'
                         else:
-                            print("Leaf is on right")
-        return blueberries
+                            obstruction = 'r'
+
+                grapeName = 'Grape' + str(grapeNum)
+                grape = Grape(grapeName, (center_x, center_y), obstruction)
+                grapes.append(grape)
+                grapeNum += 1
+
+        return grapes
 
     def run(self, img):
         self.load_image(img)
-        return self.get_blueberries_coordinates()
+        return self.get_grape_coordinates()
     
+# Class to interface with RealSense camera (made by rajat)
 class RealSenseROS:
 
     def __init__(self):
@@ -237,38 +240,28 @@ class RealSenseROS:
 
         self.point_visualization_pub.publish(marker_array)
 
-def realsense_node():
-    rospy.init_node('RealSenseROS')
-    rs_ros = RealSenseROS()
-    pixel_selector = PixelSelector()
+    def get_grapes_world_coordinates(self):
+        _, color_data, info_data, depth_data = self.get_camera_data()   
+        pixel_selector = PixelSelector()
+        utils = TFUtils()
+        pixel_selector.load_image(color_data)
+        grapes = pixel_selector.get_grape_coordinates()
 
-    pub = rospy.Publisher('/realsense', String, queue_size=10)
-    rate = rospy.Rate(1)
-    while not rospy.is_shutdown():    
+        # TODO: Can sort the grape2D if have time
 
-        header, color_data, info_data, depth_data = rs_ros.get_camera_data()   
-        pixel = pixel_selector.run(color_data)
-        print("Pixel: ",pixel)
-
-
-        for p in pixel:
-            valid, world_coordinate = rs_ros.pixel2World(info_data, p[0], p[1], depth_data)
+        for grape in grapes:
+            valid, world_coordinate = self.pixel2World(info_data, grape.loc[0], grape.loc[1], depth_data)
             
             if valid:
                 point_transform = np.eye(4)
                 point_transform[:3,3] = world_coordinate.reshape(1,3)
             
-                rs_ros.visualize_point(point_transform)
-                world_coordinate = str(list(world_coordinate))
-                pub.publish(world_coordinate)
-                print("World Coordinate: ", world_coordinate)
+                self.visualize_point(point_transform)
+                world_coordinate = list(world_coordinate)
+
+                # publish the grape location to the tf
+                utils.publishTransformationToTF("camera_color_optical_frame", grape.name, point_transform)
+
             else:
                 rospy.loginfo("Pixel selected has invalid depth :(")
-
-        rate.sleep()
-
-if __name__ == "__main__":
-    try:
-        realsense_node()
-    except rospy.ROSInterruptException:
-        pass
+        return grapes

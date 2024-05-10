@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import sys
 import copy
 import rospy
@@ -7,85 +5,10 @@ import moveit_commander
 import geometry_msgs.msg
 from tf.transformations import quaternion_from_euler
 import tf2_ros
-from interbotix_common_modules import angle_manipulation as ang
 
 from math import radians
-from moveit_msgs.msg import DisplayTrajectory, OrientationConstraint
-from geometry_msgs.msg import Quaternion, TransformStamped, Pose
-from std_msgs.msg import String
-import threading
-import json
-from interbotix_perception_modules.armtag import InterbotixArmTagInterface
-import numpy as np
-from scipy.spatial.transform import Rotation
-
-vision_sub_done = threading.Event()
-vision_sub = None
-blueberry_coordinates = (0.3, 0.05, 0.25)
-
-class TFUtils:
-    def __init__(self):
-        self.tfBuffer = tf2_ros.Buffer() # Using default cache time of 10 secs
-        self.listener = tf2_ros.TransformListener(self.tfBuffer)
-        self.broadcaster = tf2_ros.TransformBroadcaster()
-        self.control_rate = rospy.Rate(100)
-    
-    def getTransformationFromTF(self, source_frame, target_frame):
-
-        while not rospy.is_shutdown():
-            try:
-                # print("Looking for transform")
-                transform = self.tfBuffer.lookup_transform(source_frame, target_frame, rospy.Time())
-                break
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                self.control_rate.sleep()
-                continue
-
-        T = np.zeros((4,4))
-        T[:3,:3] = Rotation.from_quat([transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w]).as_matrix()
-        T[:3,3] = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z]).reshape(1,3)
-        T[3,3] = 1
-
-        print("Translation: ", T[:3,3])
-        print("Rotation in quaternion: ", transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w)
-        print("Rotation in euler: ", Rotation.from_quat([transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w]).as_euler('xyz', degrees=True))
-
-        return T
-    
-    def publishTransformationToTF(self, source_frame, target_frame, transform):
-
-        t = TransformStamped()
-
-        t.header.stamp = rospy.Time.now()
-        t.header.frame_id = source_frame
-        t.child_frame_id = target_frame
-
-        t.transform.translation.x = transform.transform.translation.x
-        t.transform.translation.y = transform.transform.translation.y
-        t.transform.translation.z = transform.transform.translation.z
-
-        # R = Rotation.from_matrix(transform[:3,:3]).as_quat()
-        t.transform.rotation.x = transform.transform.rotation.x
-        t.transform.rotation.y = transform.transform.rotation.y
-        t.transform.rotation.z = transform.transform.rotation.z
-        t.transform.rotation.w = transform.transform.rotation.w
-
-        self.broadcaster.sendTransform(t)
-
-    def get_pose_msg_from_transform(self, transform):
-
-        pose = Pose()
-        pose.position.x = transform[0,3]
-        pose.position.y = transform[1,3]
-        pose.position.z = transform[2,3]
-
-        quat = Rotation.from_matrix(transform[:3,:3]).as_quat()
-        pose.orientation.x = quat[0]
-        pose.orientation.y = quat[1]
-        pose.orientation.z = quat[2]
-        pose.orientation.w = quat[3]
-
-        return pose
+from moveit_msgs.msg import DisplayTrajectory
+from geometry_msgs.msg import Quaternion
 
 class MoveGroupPythonInterfaceTutorial(object):
     def __init__(self):
@@ -111,9 +34,6 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.set_max_acceleration_scaling_factor(0.5)  # Adjust as necessary
         self.tfBuffer = tf2_ros.Buffer()
         
-            
-
-
     def all_close(self, goal, actual, tolerance=0.01):
         if type(goal) is list:
             for index in range(len(goal)):
@@ -304,86 +224,3 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.clear_pose_targets()  # Clear targets after execution
 
         return plan_success
-
-
-def read_vision_callback(data):
-    global blueberry_coordinates
-    received = json.loads(data.data)
-
-    # TODO: add a little bit of buffer so we're going to adjust the depth a little less
-    blueberry_coordinates = received
-    print(blueberry_coordinates)
-    vision_sub.unregister()
-    vision_sub_done.set()
-    
-def main():
-    tutorial = MoveGroupPythonInterfaceTutorial()
-    print("============ Press `Enter` to begin the tutorial by setting up the moveit_commander (press ctrl-d to exit) ...")
-    input()
-    tutorial.go_to_armtag_position()
-    utils = TFUtils()
-
-    global vision_sub, vision_sub_done, blueberry_coordinates
-    print("============ Press `Enter` to execute detection of a ripe blueberry ...")
-    input()
-
-    # We are going to first take a snapshot of the camera and determine the location of a _single_ blueberry
-    # (we can expand to make this whole thing a for loop later)
-    vision_sub = rospy.Subscriber('/realsense', String, read_vision_callback)
-
-    vision_sub_done.wait()
-
-    rpy = ang.rotationMatrixToEulerAngles(np.eye(3,3))
-    quat = quaternion_from_euler(rpy[0], rpy[1], rpy[2])
-
-    blueberry =  TransformStamped()
-    blueberry.transform.translation.x = blueberry_coordinates[0]
-    blueberry.transform.translation.y = blueberry_coordinates[1]
-    blueberry.transform.translation.z = blueberry_coordinates[2]
-    blueberry.transform.rotation = Quaternion(quat[0], quat[1], quat[2], quat[3])
-    blueberry.header.frame_id = 'blueberry'
-    blueberry.child_frame_id = 'camera_color_optical_frame'
-    blueberry.header.stamp = rospy.Time.now()
-
-    utils.publishTransformationToTF('camera_color_optical_frame', 'blueberry', blueberry)
-
-    # # # apply it
-    transform_blueb_world = utils.getTransformationFromTF('world', 'blueberry')
-    new_coord = transform_blueb_world[:3, 3]
-
-    print("============ Press `Enter` to plan and execute a path to pick a box ...")
-    input()
-
-    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=new_coord)
-    if fraction > 0.75:
-        tutorial.execute_plan(plan)
-    else:
-        print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
-
-    # Assume some operations here...
-    print("Press `Enter` to close Gripper .")
-    input()
-    tutorial.gripper_close()
-    print("Gripper closed. Exiting.")
-
-    print("Press `Enter` to rotate the wrist joint by 45 degrees...")
-    input()
-    if tutorial.rotate_wrist_joint(-90):
-        print("Wrist rotation completed successfully!")
-    else:
-        print("Failed to rotate the wrist joint.")
-       
-    print("Press `Enter` to move the robot to the 'Sleep' pose...")
-    input()
-    if tutorial.go_to_sleep_pose():
-        print("The robot is now in the 'Sleep' pose.")
-    else:
-        print("Failed to move the robot to the 'Sleep' pose.")
-
-    tutorial.gripper_open()
-
-    rospy.spin()
-    
-
-if __name__ == '__main__':
-    main()

@@ -58,10 +58,10 @@ interbotix_ros_toolboxes/interbotix_common_toolbox/interbotix_moveit_interface/C
 
 /home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/lib/gennodejs/gen_nodejs.py
 /home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_common_toolbox/interbotix_moveit_interface/srv/MoveItPlan.srv
-/home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/share/std_msgs/msg/String.msg
 /home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/share/geometry_msgs/msg/Point.msg
-/home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/share/geometry_msgs/msg/Pose.msg
 /home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/share/geometry_msgs/msg/Quaternion.msg
+/home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/share/std_msgs/msg/String.msg
+/home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv/MoveItPlan.js: /opt/ros/noetic/share/geometry_msgs/msg/Pose.msg
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --blue --bold --progress-dir=/home/group8/interbotix_ws/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Generating Javascript code from interbotix_moveit_interface/MoveItPlan.srv"
 	cd /home/group8/interbotix_ws/build/interbotix_ros_toolboxes/interbotix_common_toolbox/interbotix_moveit_interface && ../../../catkin_generated/env_cached.sh /usr/bin/python3 /opt/ros/noetic/share/gennodejs/cmake/../../../lib/gennodejs/gen_nodejs.py /home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_common_toolbox/interbotix_moveit_interface/srv/MoveItPlan.srv -Igeometry_msgs:/opt/ros/noetic/share/geometry_msgs/cmake/../msg -Istd_msgs:/opt/ros/noetic/share/std_msgs/cmake/../msg -p interbotix_moveit_interface -o /home/group8/interbotix_ws/devel/share/gennodejs/ros/interbotix_moveit_interface/srv
 

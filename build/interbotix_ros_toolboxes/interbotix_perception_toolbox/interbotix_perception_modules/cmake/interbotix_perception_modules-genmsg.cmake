@@ -24,7 +24,7 @@ add_custom_target(_interbotix_perception_modules_generate_messages_check_deps_${
 
 get_filename_component(_filename "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv" NAME_WE)
 add_custom_target(_interbotix_perception_modules_generate_messages_check_deps_${_filename}
-  COMMAND ${CATKIN_ENV} ${PYTHON_EXECUTABLE} ${GENMSG_CHECK_DEPS_SCRIPT} "interbotix_perception_modules" "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv" "interbotix_perception_modules/ClusterInfo:geometry_msgs/Point:std_msgs/ColorRGBA"
+  COMMAND ${CATKIN_ENV} ${PYTHON_EXECUTABLE} ${GENMSG_CHECK_DEPS_SCRIPT} "interbotix_perception_modules" "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv" "std_msgs/ColorRGBA:geometry_msgs/Point:interbotix_perception_modules/ClusterInfo"
 )
 
 get_filename_component(_filename "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/FilterParams.srv" NAME_WE)
@@ -54,7 +54,7 @@ _generate_msg_cpp(interbotix_perception_modules
 _generate_srv_cpp(interbotix_perception_modules
   "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv"
   "${MSG_I_FLAGS}"
-  "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg"
+  "/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg"
   ${CATKIN_DEVEL_PREFIX}/${gencpp_INSTALL_DIR}/interbotix_perception_modules
 )
 _generate_srv_cpp(interbotix_perception_modules
@@ -111,7 +111,7 @@ _generate_msg_eus(interbotix_perception_modules
 _generate_srv_eus(interbotix_perception_modules
   "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv"
   "${MSG_I_FLAGS}"
-  "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg"
+  "/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg"
   ${CATKIN_DEVEL_PREFIX}/${geneus_INSTALL_DIR}/interbotix_perception_modules
 )
 _generate_srv_eus(interbotix_perception_modules
@@ -168,7 +168,7 @@ _generate_msg_lisp(interbotix_perception_modules
 _generate_srv_lisp(interbotix_perception_modules
   "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv"
   "${MSG_I_FLAGS}"
-  "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg"
+  "/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg"
   ${CATKIN_DEVEL_PREFIX}/${genlisp_INSTALL_DIR}/interbotix_perception_modules
 )
 _generate_srv_lisp(interbotix_perception_modules
@@ -225,7 +225,7 @@ _generate_msg_nodejs(interbotix_perception_modules
 _generate_srv_nodejs(interbotix_perception_modules
   "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv"
   "${MSG_I_FLAGS}"
-  "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg"
+  "/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg"
   ${CATKIN_DEVEL_PREFIX}/${gennodejs_INSTALL_DIR}/interbotix_perception_modules
 )
 _generate_srv_nodejs(interbotix_perception_modules
@@ -282,7 +282,7 @@ _generate_msg_py(interbotix_perception_modules
 _generate_srv_py(interbotix_perception_modules
   "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/srv/ClusterInfoArray.srv"
   "${MSG_I_FLAGS}"
-  "/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg"
+  "/opt/ros/noetic/share/std_msgs/cmake/../msg/ColorRGBA.msg;/opt/ros/noetic/share/geometry_msgs/cmake/../msg/Point.msg;/home/group8/interbotix_ws/src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/msg/ClusterInfo.msg"
   ${CATKIN_DEVEL_PREFIX}/${genpy_INSTALL_DIR}/interbotix_perception_modules
 )
 _generate_srv_py(interbotix_perception_modules
