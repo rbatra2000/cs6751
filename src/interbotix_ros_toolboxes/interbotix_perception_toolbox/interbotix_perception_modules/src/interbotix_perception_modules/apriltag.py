@@ -85,13 +85,13 @@ class InterbotixAprilTagInterface(object):
                 ))
         else:
             pose = detections[0].pose.pose.pose #TODO: support for multiple tags
-            x1 = pose.position.x
-            y1 = pose.position.y
-            z1 = pose.position.z
+            # x1 = pose.position.x
+            # y1 = pose.position.y
+            # z1 = pose.position.z
 
-            pose.position.x = z1
-            pose.position.y = y1
-            pose.position.z = x1
+            # pose.position.x = z1
+            # pose.position.y = -y1
+            # pose.position.z = x1
         
             # publish pose to /static_transforms
             if publish_tf:
