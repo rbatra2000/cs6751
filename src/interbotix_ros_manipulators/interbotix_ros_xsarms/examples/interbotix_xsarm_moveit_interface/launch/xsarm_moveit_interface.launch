@@ -119,4 +119,6 @@
     <remap from="/collision_object"               to="/$(arg robot_name)/collision_object"/>
   </node>
 
+  <node pkg="tf" type="static_transform_publisher" name="camera_to_base" args="0.07073071629483779 0.37749891646345485 0.2974557543063836 0.44737255651040275 -0.4940919141222026 0.5187847713705369 0.5353441295787451 camera_color_optical_frame world 100" />
+
 </launch>
