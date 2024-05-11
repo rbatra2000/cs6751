@@ -33,7 +33,7 @@ class InterbotixArmTagInterface(object):
     ### @return - True if transform was found and published successfully; False otherwise
     ### @details - the 'position_only' parameter can only be set to True if there already exists a 'tf' path from the camera color frame to the AR tag frame on the arm;
     ###            it can be used to try to get a more accurate position of the AR tag than what is dictated by the URDF
-    def find_ref_to_arm_base_transform(self, ref_frame=None, arm_base_frame=None, num_samples=10, position_only=False):
+    def find_ref_to_arm_base_transform(self, ref_frame=None, arm_base_frame=None, num_samples=100, position_only=False):
         if ref_frame == None:
             ref_frame = self.ref_frame
         if arm_base_frame == None:

@@ -77,7 +77,7 @@ class PixelSelector:
                 # get contours to separate the leaves
                 greencnts = cv2.findContours(green_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-                obstruction = ''
+                obstruction = 0
                 # see if the bounding box of any leaves are overlapping with the grape
                 for gCnt in greencnts:
                     (xl, yl, wl, hl) = cv2.boundingRect(gCnt)
@@ -91,9 +91,9 @@ class PixelSelector:
                         cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
                         leaf_x, _ = ((int)(xl+wl/2), (int)(yl+hl/2))
                         if leaf_x < center_x:
-                            obstruction = 'l'
+                            obstruction = 2
                         else:
-                            obstruction = 'r'
+                            obstruction = 1
 
                 grapeName = 'Grape' + str(grapeNum)
                 grape = Grape(grapeName, (center_x, center_y), obstruction)

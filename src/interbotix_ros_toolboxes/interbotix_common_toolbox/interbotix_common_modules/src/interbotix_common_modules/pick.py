@@ -6,7 +6,7 @@ import geometry_msgs.msg
 from tf.transformations import quaternion_from_euler
 import tf2_ros
 
-from math import radians
+from math import radians, degrees
 from moveit_msgs.msg import DisplayTrajectory
 from geometry_msgs.msg import Quaternion
 
@@ -34,7 +34,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.set_max_acceleration_scaling_factor(0.5)  # Adjust as necessary
         self.tfBuffer = tf2_ros.Buffer()
         
-    def all_close(self, goal, actual, tolerance=0.01):
+    def all_close(self, goal, actual, tolerance=0.05):
         if type(goal) is list:
             for index in range(len(goal)):
                 if abs(actual[index] - goal[index]) > tolerance:
@@ -83,7 +83,23 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.gripper_group.go(gripper_joint_values, wait=True)
         self.gripper_group.stop()  # Ensure no residual movement
 
-    def add_box(self, object_ee_goal=(0.3, 0.05, 0.25),bias_angle = radians(30),timeout=4):
+    def add_collision_object(self,object_ee_goal=(0.0, 0.2, 0.1)):
+        # Define the size and pose of the box
+        #box_size = (0.3, 0.05, 0.3)  # Dimensions of the box (width, depth, height)
+        box_size = (0.1, 0.1, 0.1)
+        box_pose = geometry_msgs.msg.PoseStamped()
+        box_pose.header.frame_id = "world" #self.planning_frame
+        box_pose.pose.orientation.w = 1.0
+        box_pose.pose.position.x = object_ee_goal[0]-0.00
+        box_pose.pose.position.y = object_ee_goal[1]+0.00
+        box_pose.pose.position.z = 0.01 + box_size[2] / 2  # Position at half the height to sit on the plane
+
+        # Use the correct method to add a box to the planning scene
+        self.scene.add_box("big_box1", box_pose, box_size)
+        rospy.sleep(1)  # Allow time for the addition to be processed
+
+
+    def add_box(self, object_ee_goal=(0.3, 0.05, 0.25), bias_angle = radians(0), timeout=4):
         box_pose = geometry_msgs.msg.PoseStamped()
         box_pose.header.frame_id = "world"
         box_pose.pose.position.x = object_ee_goal[0]
@@ -111,9 +127,19 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.scene.remove_world_object(self.box_name)
         self.wait_for_state_update(box_is_known=False, timeout=timeout)
 
-    def plan_cartesian_path_to_pick_box(self, object_ee_goal=(0.40, 0.03, 0.3),bias_angle = radians(30)):
+    def plan_cartesian_path_to_pick_box(self, object_ee_goal=(0.40, 0.03, 0.3), bias = 0):
         # Increase planning time
         self.arm_group.set_planning_time(10.0)
+    
+        # Determine the direction based on the bias input
+        if bias == 0:
+            bias_angle = radians(0)
+        elif bias == 1: # Bias to the right
+            bias_angle = radians(15)
+        else:           # Bias to the left     
+            bias_angle = radians(-15)
+
+
 
         waypoints = []
         # Start with the current end-effector pose
@@ -190,28 +216,21 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.stop()  # Ensure no residual movement
     
     
-    def rotate_wrist_joint(self, rotation_degrees=-90):
-        # Convert degrees to radians
+    def rotate_wrist_joint(self, rotation_degrees=-60):
         rotation_radians = radians(rotation_degrees)
-
-        # Get the current joint values from the group
         current_joint_values = self.arm_group.get_current_joint_values()
+        print("Current joint values:", current_joint_values)  # Debug print
 
-        # Assuming the wrist joint is the last in the list of joints
-        # This index might need to be adjusted depending on the specific joint configuration
-        wrist_joint_index = -1  # Typically the last joint for wrist rotation
-
-        # Add the rotation to the current joint value of the wrist
+        wrist_joint_index = -1  # Adjust as per your robot's configuration
         current_joint_values[wrist_joint_index] += rotation_radians
+        print("Target joint values after rotation:", degrees(current_joint_values[-1]))  # Debug print
 
-        # Set the new joint values as the target for the robot
+        # if current_joint_values[wrist_joint_index] < min_limit or current_joint_values[wrist_joint_index] > max_limit:
+        #     print("Rotation out of bounds. Adjusting...")
+            # Handle out-of-bounds target here
+
         self.arm_group.set_joint_value_target(current_joint_values)
-
-        # Plan and execute the trajectory
         plan_success = self.arm_group.go(wait=True)
-        self.arm_group.stop()  # Ensure there's no residual movement
-        self.arm_group.clear_pose_targets()  # Clear targets after execution
-
         return plan_success
     
     def go_to_sleep_pose(self):

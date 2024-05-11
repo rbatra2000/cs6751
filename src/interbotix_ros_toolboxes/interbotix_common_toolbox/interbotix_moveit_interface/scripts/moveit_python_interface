@@ -2,6 +2,8 @@
 
 import rospy
 
+from interbotix_perception_modules.armtag import InterbotixArmTagInterface
+
 # path: src/interbotix_ros_toolboxes/interbotix_perception_toolbox/interbotix_perception_modules/src/interbotix_perception_modules/vision.py
 from interbotix_perception_modules.vision import RealSenseROS, Grape
 
@@ -18,13 +20,18 @@ def main():
     vision = RealSenseROS()
     utils = TFUtils()
     global vision_sub, vision_sub_done, blueberry_coordinates
+    tutorial.add_collision_object()
 
     print("============ Press `Enter` to go to home position ...")
     input()
     tutorial.go_to_armtag_position()
+    tutorial.gripper_open()
 
     print("============ Press `Enter` to execute detection of a ripe grape ...")
     input()
+
+    armtag = InterbotixArmTagInterface()
+    # print(armtag.find_ref_to_arm_base_transform())
     
     grapes = vision.get_grapes_world_coordinates()
     grapeCoords = []
@@ -35,15 +42,21 @@ def main():
         coordinate = transform[:3, 3]
 
         # make sure we don't hit the wall
-        coordinate[0] = min(coordinate[0], WALL_DISTANCE)
+        # coordinate[0] = min(coordinate[0], WALL_DISTANCE)
 
+        # move the gripper a bit closer to the grape
+        coordinate[0] -= 0.07
+        coordinate[1] -= 0.04
+        coordinate[2] += 0.03
         grapeCoords.append(tuple(coordinate))
 
     print("============ Press `Enter` to plan and execute a path to pick the first grape ...")
     input()
 
     print("Planning route to pick grape at coordinates: ", grapeCoords[0])
-    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=grapeCoords[0])
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=grapeCoords[0], bias=grapes[0].obstruction)
+
+    # plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=(0.25307864690991105, 0.15485132649845276, 0.44172762680138555))
     if fraction > 0.75:
         tutorial.execute_plan(plan)
     else:
@@ -55,21 +68,31 @@ def main():
     tutorial.gripper_close()
     print("Gripper closed. Exiting.")
 
-    print("Press `Enter` to rotate the wrist joint by 45 degrees...")
+    print("Press `Enter` to rotate the wrist joint by degrees...")
     input()
-    if tutorial.rotate_wrist_joint(-90):
+    if tutorial.rotate_wrist_joint():
         print("Wrist rotation completed successfully!")
     else:
         print("Failed to rotate the wrist joint.")
        
-    print("Press `Enter` to move the robot to the 'Sleep' pose...")
+    print("Press `Enter` to move the robot to the drop box pose...")
     input()
+
+    # move to box
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=(0.0, 0.17, 0.18))
+    if fraction > 0.75:
+        tutorial.execute_plan(plan)
+    else:
+        print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
+
+    tutorial.gripper_open()
+    print("Press `Enter` to move the robot to the sleep pose...")
+    input()
+    tutorial.go_to_armtag_position()
     if tutorial.go_to_sleep_pose():
         print("The robot is now in the 'Sleep' pose.")
     else:
         print("Failed to move the robot to the 'Sleep' pose.")
-
-    tutorial.gripper_open()
 
     rospy.spin()
     
