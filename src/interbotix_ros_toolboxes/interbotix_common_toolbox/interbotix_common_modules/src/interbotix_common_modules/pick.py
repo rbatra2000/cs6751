@@ -83,10 +83,10 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.gripper_group.go(gripper_joint_values, wait=True)
         self.gripper_group.stop()  # Ensure no residual movement
 
-    def add_collision_object(self,object_ee_goal=(0.0, 0.2, 0.1)):
+    def add_collision_object(self,object_ee_goal=(0.17, 0.00, 0.22)):
         # Define the size and pose of the box
         #box_size = (0.3, 0.05, 0.3)  # Dimensions of the box (width, depth, height)
-        box_size = (0.1, 0.1, 0.1)
+        box_size = (0.05, 0.05, 0.05)
         box_pose = geometry_msgs.msg.PoseStamped()
         box_pose.header.frame_id = "world" #self.planning_frame
         box_pose.pose.orientation.w = 1.0
@@ -204,7 +204,8 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.execute(plan, wait=True)
     
     def go_to_armtag_position(self):
-        home_position = [0, -1, 1, 0, -1.5, 0]  # Example values
+        # home_position = [0, -1, 1, 0, -1.5, 0]  # Example values
+        home_position = [0, -1, 1, 0, 0, 0]  # Example values
         self.arm_group.go(home_position, wait=True)
         rospy.sleep(1)  # Allow time for the robot to stabilize
         self.arm_group.stop()  # Ensure no residual movement
@@ -216,7 +217,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.stop()  # Ensure no residual movement
     
     
-    def rotate_wrist_joint(self, rotation_degrees=-45):
+    def rotate_wrist_joint(self, rotation_degrees=45):
         rotation_radians = radians(rotation_degrees)
         current_joint_values = self.arm_group.get_current_joint_values()
         print("Current joint values:", current_joint_values)  # Debug print

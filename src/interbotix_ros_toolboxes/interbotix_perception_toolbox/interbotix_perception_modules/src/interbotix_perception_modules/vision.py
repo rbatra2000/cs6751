@@ -13,8 +13,9 @@ from geometry_msgs.msg import Pose
 from interbotix_common_modules.utils import TFUtils
 
 # ASSUMPTIONS: minimum grape and leaf area
-MIN_GRAPE_AREA = 75
+MIN_GRAPE_AREA = 50
 MIN_LEAF_AREA = 50
+MAX_LEAF_AREA = 500
 
 class Grape:
     def __init__(self, name, loc, bias):
@@ -43,8 +44,8 @@ class PixelSelector:
         frame = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
 
         # ASSUMPTIONS: Using blue color range instead of red for the grapes due to HSV color space
-        lower_red = np.array([110,50,50])
-        upper_red = np.array([130,255,255])
+        lower_red = np.array([90,50,0])
+        upper_red = np.array([150,255,255])
 
         # create a mask for the red color
         mask = cv2.inRange(frame, lower_red, upper_red)
@@ -84,7 +85,7 @@ class PixelSelector:
                     area =cv2.contourArea(gCnt)
 
                     # we are adding a threshold to make sure that we have valid grapes
-                    if area < MIN_LEAF_AREA:
+                    if area < MIN_LEAF_AREA or area > MAX_LEAF_AREA:
                         continue
 
                     if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
@@ -98,9 +99,11 @@ class PixelSelector:
 
                 grapeName = 'Grape' + str(grapeNum)
                 grape = Grape(grapeName, (center_x, center_y), bias)
-                # print("GRAPE", grapeName, "at", grape.loc, "with bias", grape.bias)
+                print("GRAPE", grapeName, "at", grape.loc, "with bias", grape.bias)
                 grapes.append(grape)
                 grapeNum += 1
+
+        grapes = sorted(grapes, key=lambda g: g.loc[0], reverse=True)
 
         return grapes
 

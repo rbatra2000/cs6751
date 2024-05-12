@@ -14,8 +14,9 @@ from visualization_msgs.msg import Marker, MarkerArray
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Pose
 
-MIN_BLUEB_AREA = 100
+MIN_BLUEB_AREA = 50
 MIN_LEAF_AREA = 50
+MAX_LEAF_AREA = 500
 
 class PixelSelector:
     def __init__(self):
@@ -41,8 +42,8 @@ class PixelSelector:
             # cv2.waitKey()
 
             # TODO: this is actually orange l o l
-            lower_blue = np.array([110,50,50])
-            upper_blue = np.array([130,255,255])
+            lower_blue = np.array([90,50,0])
+            upper_blue = np.array([150,255,255])
 
             mask = cv2.inRange(frame, lower_blue, upper_blue)
             # cv2.imshow('frame', mask)
@@ -88,7 +89,7 @@ class PixelSelector:
 
                         # we are adding a threshold to make sure that we have valid blueberries
                         # TODO: this is arbitrary for now but we can change
-                        if area < MIN_LEAF_AREA:
+                        if area < MIN_LEAF_AREA or area > MAX_LEAF_AREA:
                             continue
 
                         if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
