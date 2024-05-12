@@ -13,14 +13,14 @@ from geometry_msgs.msg import Pose
 from interbotix_common_modules.utils import TFUtils
 
 # ASSUMPTIONS: minimum grape and leaf area
-MIN_GRAPE_AREA = 150
+MIN_GRAPE_AREA = 75
 MIN_LEAF_AREA = 50
 
 class Grape:
-    def __init__(self, name, loc, obstruction):
+    def __init__(self, name, loc, bias):
         self.name = name
         self.loc = loc
-        self.obstruction = obstruction
+        self.bias = bias
 
 class PixelSelector:
     def __init__(self):
@@ -77,7 +77,7 @@ class PixelSelector:
                 # get contours to separate the leaves
                 greencnts = cv2.findContours(green_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-                obstruction = 0
+                bias = 0
                 # see if the bounding box of any leaves are overlapping with the grape
                 for gCnt in greencnts:
                     (xl, yl, wl, hl) = cv2.boundingRect(gCnt)
@@ -91,12 +91,14 @@ class PixelSelector:
                         cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
                         leaf_x, _ = ((int)(xl+wl/2), (int)(yl+hl/2))
                         if leaf_x < center_x:
-                            obstruction = 2
+                            bias = 1 # if leaf is on left
                         else:
-                            obstruction = 1
+                            bias = 2 # if leaf is on right
+                        break
 
                 grapeName = 'Grape' + str(grapeNum)
-                grape = Grape(grapeName, (center_x, center_y), obstruction)
+                grape = Grape(grapeName, (center_x, center_y), bias)
+                # print("GRAPE", grapeName, "at", grape.loc, "with bias", grape.bias)
                 grapes.append(grape)
                 grapeNum += 1
 

@@ -25,12 +25,13 @@ def main():
     print("============ Press `Enter` to go to home position ...")
     input()
     tutorial.go_to_armtag_position()
+    # rospy.sleep(1)
     tutorial.gripper_open()
 
     print("============ Press `Enter` to execute detection of a ripe grape ...")
     input()
 
-    armtag = InterbotixArmTagInterface()
+    # armtag = InterbotixArmTagInterface()
     # print(armtag.find_ref_to_arm_base_transform())
     
     grapes = vision.get_grapes_world_coordinates()
@@ -45,16 +46,36 @@ def main():
         # coordinate[0] = min(coordinate[0], WALL_DISTANCE)
 
         # move the gripper a bit closer to the grape
-        coordinate[0] -= 0.07
-        coordinate[1] -= 0.04
-        coordinate[2] += 0.03
+        coordinate[0] -= 0.068
+
+        # if gripper is biased, add more bias
+        if grape.bias > 0:
+            coordinate[0] -= 0.01
+
+        coordinate[1] -= 0.035
+        coordinate[2] += 0.035
         grapeCoords.append(tuple(coordinate))
 
     print("============ Press `Enter` to plan and execute a path to pick the first grape ...")
     input()
 
     print("Planning route to pick grape at coordinates: ", grapeCoords[0])
-    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=grapeCoords[0], bias=grapes[0].obstruction)
+
+    # first we move x distance in away from wall
+    relGrape = [grapeCoords[0][0] - 0.08, grapeCoords[0][1], grapeCoords[0][2]]
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=relGrape)
+
+    # plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=(0.25307864690991105, 0.15485132649845276, 0.44172762680138555))
+    if fraction > 0.75:
+        tutorial.execute_plan(plan)
+    else:
+        print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
+
+    print("Planning route to pick grape at coordinates: ", grapeCoords[0], " with bias ", grapes[0].bias)
+
+
+    # actually pick up the grape
+    plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=grapeCoords[0], bias=grapes[0].bias)
 
     # plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=(0.25307864690991105, 0.15485132649845276, 0.44172762680138555))
     if fraction > 0.75:
@@ -80,7 +101,7 @@ def main():
 
     # move to box
     plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=(0.0, 0.17, 0.18))
-    if fraction > 0.75:
+    if fraction > 0.99:
         tutorial.execute_plan(plan)
     else:
         print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))

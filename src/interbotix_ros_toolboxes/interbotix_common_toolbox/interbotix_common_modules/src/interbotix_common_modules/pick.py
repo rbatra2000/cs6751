@@ -216,7 +216,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.arm_group.stop()  # Ensure no residual movement
     
     
-    def rotate_wrist_joint(self, rotation_degrees=-60):
+    def rotate_wrist_joint(self, rotation_degrees=-45):
         rotation_radians = radians(rotation_degrees)
         current_joint_values = self.arm_group.get_current_joint_values()
         print("Current joint values:", current_joint_values)  # Debug print
