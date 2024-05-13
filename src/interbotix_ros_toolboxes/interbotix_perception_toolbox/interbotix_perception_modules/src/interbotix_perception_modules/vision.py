@@ -88,14 +88,14 @@ class PixelSelector:
                     if area < MIN_LEAF_AREA or area > MAX_LEAF_AREA:
                         continue
 
-                    if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
-                        cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
-                        leaf_x, _ = ((int)(xl+wl/2), (int)(yl+hl/2))
-                        if leaf_x < center_x:
-                            bias = 1 # if leaf is on left
-                        else:
-                            bias = 2 # if leaf is on right
-                        break
+                    # if self.intersection((xl,yl,wl,hl), (xg,yg,wg,hg)):
+                    #     cv2.rectangle(self.img,(xl,yl), (xl+wl, yl+hl), (0,255,0), 2)
+                    #     leaf_x, _ = ((int)(xl+wl/2), (int)(yl+hl/2))
+                    #     if leaf_x < center_x:
+                    #         bias = 1 # if leaf is on left
+                    #     else:
+                    #         bias = 2 # if leaf is on right
+                    #     break
 
                 grapeName = 'Grape' + str(grapeNum)
                 grape = Grape(grapeName, (center_x, center_y), bias)
@@ -103,7 +103,7 @@ class PixelSelector:
                 grapes.append(grape)
                 grapeNum += 1
 
-        grapes = sorted(grapes, key=lambda g: g.loc[0], reverse=True)
+        grapes = sorted(grapes, key=lambda g: g.loc[0])
 
         return grapes
 

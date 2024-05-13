@@ -61,7 +61,7 @@ def main():
     print("============ Press `Enter` to go to home position ...")
     input()
     tutorial.go_to_armtag_position()
-    # rospy.sleep(1)
+    rospy.sleep(.5)
     # plan, fraction = tutorial.plan_cartesian_path_to_pick_box(object_ee_goal=(0.18, 0.00, 0.22)) #(0.0, 0.17, 0.18)
     tutorial.gripper_open()
 
@@ -125,6 +125,8 @@ def main():
         else:
             print("Path planning failed with only {:.2f}% of the path planned.".format(fraction * 100))
 
+
+        rospy.sleep(.5)
         tutorial.gripper_open()
 
         print("Press `Enter` to move the robot to the home pose...")
