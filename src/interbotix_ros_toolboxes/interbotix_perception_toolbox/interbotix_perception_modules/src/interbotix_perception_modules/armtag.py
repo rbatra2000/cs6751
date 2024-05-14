@@ -33,11 +33,13 @@ class InterbotixArmTagInterface(object):
     ### @return - True if transform was found and published successfully; False otherwise
     ### @details - the 'position_only' parameter can only be set to True if there already exists a 'tf' path from the camera color frame to the AR tag frame on the arm;
     ###            it can be used to try to get a more accurate position of the AR tag than what is dictated by the URDF
-    def find_ref_to_arm_base_transform(self, ref_frame=None, arm_base_frame=None, num_samples=5, position_only=False):
+    def find_ref_to_arm_base_transform(self, ref_frame=None, arm_base_frame=None, num_samples=100, position_only=False):
         if ref_frame == None:
             ref_frame = self.ref_frame
         if arm_base_frame == None:
             arm_base_frame = self.arm_base_frame
+
+        print("TEST", ref_frame, arm_base_frame, self.arm_tag_frame, self.apriltag.image_frame_id)
 
         # take the average pose (w.r.t. the camera frame) of the AprilTag over 'num_samples' samples
         point = Point()
@@ -77,7 +79,7 @@ class InterbotixArmTagInterface(object):
             T_RefCam = self.get_transform(tfBuffer, ref_frame, self.apriltag.image_frame_id)
             T_RefBase = np.dot(T_RefCam, T_CamBase)
 
-        # Now, we can publish the transform from the reference link to the arm's base_link legally as the arm's base_link has no parent
+        # Now, we can publish the transform from the reference link (camera) to the arm's base_link legally as the arm's base_link has no parent
         # (or even if it does, we can safely overwrite it since the 'tf' tree will remain intact)
         self.rpy = ang.rotationMatrixToEulerAngles(T_RefBase[:3,:3])
         quat = quaternion_from_euler(self.rpy[0], self.rpy[1], self.rpy[2])
@@ -91,7 +93,11 @@ class InterbotixArmTagInterface(object):
         self.trans.header.stamp = rospy.Time.now()
         self.apriltag.pub_transforms.publish(self.trans)
 
-        return True
+        broadcaster = tf2_ros.TransformBroadcaster()
+        broadcaster.sendTransform(self.trans)
+
+        # TODO: change back to return True
+        return self.trans
 
     ### @brief Helper function to lookup a transform and convert it into a 4x4 transformation matrix
     ### @param tfBuffer - tf2_ros buffer instance from which to lookup transforms from the 'tf' tree

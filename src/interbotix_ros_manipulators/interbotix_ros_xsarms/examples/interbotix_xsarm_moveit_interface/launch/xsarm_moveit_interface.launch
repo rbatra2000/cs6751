@@ -1,9 +1,9 @@
 <launch>
 
-  <arg name="robot_model"                       default=""/>
+  <arg name="robot_model"                       default="wx250s"/>
   <arg name="robot_name"                        default="$(arg robot_model)"/>
   <arg name="base_link_frame"                   default="base_link"/>
-  <arg name="show_ar_tag"                       default="false"/>
+  <arg name="show_ar_tag"                       default="true"/>
   <arg name="use_world_frame"                   default="true"/>
   <arg name="external_urdf_loc"                 default=""/>
   <arg name="external_srdf_loc"                 default=""/>
@@ -11,13 +11,63 @@
   <arg name="use_moveit_rviz"                   default="true"/>
   <arg name="rviz_frame"                        default="world"/>
   <arg name="use_gazebo"                        default="false"/>
-  <arg name="use_actual"                        default="false"/>
+  <arg name="use_actual"                        default="true"/>
   <arg name="use_fake"                          default="false"/>
-  <arg name="dof"                               default="5"/>
+  <arg name="dof"                               default="6"/>
   <arg name="world_name"                        default="$(find interbotix_xsarm_gazebo)/worlds/xsarm_gazebo.world"/>
   <arg name="use_cpp_interface"                 default="false"/>
   <arg name="moveit_interface_gui"              default="true"/>
-  <arg name="use_python_interface"              default="false"/>
+  <arg name="use_python_interface"              default="true"/>
+
+  <!-- Perception -->
+  <arg name="filters"                           default="pointcloud"/>
+  <arg name="color_fps"                         default="30"/>
+  <arg name="color_width"                       default="640"/>
+  <arg name="color_height"                      default="480"/>
+  <arg name="depth_fps"                         default="30"/>
+  <arg name="depth_width"                       default="640"/>
+  <arg name="depth_height"                      default="480"/>
+  <arg name="camera_color_topic"                default="camera/color/image_raw"/>
+  <arg name="camera_info_topic"                 default="camera/color/camera_info"/>
+  <arg name="apriltag_ns"                       default="apriltag"/>
+  <arg name="armtag_ns"                         default="armtag"/>
+  <arg name="camera_frame"                      default="camera_color_optical_frame"/>
+  <arg name="ref_frame"                         default="$(arg camera_frame)"/>
+  <arg name="use_armtag_tuner_gui"              default="false"/>
+  <arg name="position_only"                     default="false"/>
+  <arg name="arm_base_frame"                    default="$(arg robot_name)/$(arg base_link_frame)"/>
+  <arg name="arm_tag_frame"                     default="$(arg robot_name)/ar_tag_link"/>
+  <arg name="tag_family"                        default="tagStandard41h12"/>
+  <arg name="standalone_tags"                   default="$(find interbotix_perception_modules)/config/tags.yaml"/>
+
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="filters"                           value="$(arg filters)"/>
+    <arg name="color_fps"                         value="$(arg color_fps)"/>
+    <arg name="color_width"                       value="$(arg color_width)"/>
+    <arg name="color_height"                      value="$(arg color_height)"/>
+    <arg name="depth_fps"                         value="$(arg depth_fps)"/>
+    <arg name="depth_width"                       value="$(arg depth_width)"/>
+    <arg name="depth_height"                      value="$(arg depth_height)"/>
+    <arg name="align_depth"                       value="true"/>
+  </include>
+
+  <include file="$(find interbotix_perception_modules)/launch/armtag.launch">
+    <arg name="tag_family"                        value="$(arg tag_family)"/>
+    <arg name="standalone_tags"                   value="$(arg standalone_tags)"/>
+    <arg name="camera_frame"                      value="$(arg camera_frame)"/>
+    <arg name="apriltag_ns"                       value="$(arg apriltag_ns)"/>
+    <arg name="camera_color_topic"                value="$(arg camera_color_topic)"/>
+    <arg name="camera_info_topic"                 value="$(arg camera_info_topic)"/>
+    <arg name="armtag_ns"                         value="$(arg armtag_ns)"/>
+    <arg name="ref_frame"                         value="$(arg ref_frame)"/>
+    <arg name="arm_base_frame"                    value="$(arg arm_base_frame)"/>
+    <arg name="arm_tag_frame"                     value="$(arg arm_tag_frame)"/>
+    <arg name="use_armtag_tuner_gui"              value="$(arg use_armtag_tuner_gui)"/>
+    <arg name="position_only"                     value="$(arg position_only)"/>
+  </include>
+
+  <!-- Perception -->
+
 
   <include file="$(find interbotix_xsarm_moveit)/launch/xsarm_moveit.launch">
     <arg name="robot_model"                       value="$(arg robot_model)"/>
@@ -68,5 +118,36 @@
     <remap from="/attached_collision_object"      to="/$(arg robot_name)/attached_collision_object"/>
     <remap from="/collision_object"               to="/$(arg robot_name)/collision_object"/>
   </node>
+
+  <!-- Camera Calibration for relationship between camera and base -->
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_to_base" args="0.07073071629483779 0.37749891646345485 0.2974557543063836 0.44737255651040275 -0.4940919141222026 0.5187847713705369 0.5353441295787451 camera_color_optical_frame world 100" /> -->
+
+  <!-- ground truth with 50 samples-->
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_to_base" args="0.06123003258747713 0.36871475110256985 0.30226713234455427 0.46685090155107306 -0.4902058580953892 0.49972822082417007 0.5403888948912837 camera_color_optical_frame world 100" /> -->
+
+  <!-- After calibration -->
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_to_base" args="0.07123003258747713 0.35571475110256985 0.38226713234455427 0.46685090155107306 -0.4902058580953892 0.49972822082417007 0.5403888948912837 camera_color_optical_frame world 100" /> -->
+
+
+  <!-- After calibration by test2-->
+  <node pkg="tf" type="static_transform_publisher" name="camera_to_base" args="0.07123003258747713 0.35571475110256985 0.41226713234455427 0.4887060558 -0.5110444120 0.4843177278 0.5152051422 camera_color_optical_frame world 100" />
+
+  <!-- After calibration by test1-->
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_to_base" args="0.05023003258747713 0.36571475110256985 0.41226713234455427 0.5 -0.50 0.5 0.5 camera_color_optical_frame world 100" /> -->
+
+
+  <!-- test 1 calibration -->
+  <!-- rosrun tf static_transform_publisher 0.05023003258747713 0.36571475110256985 0.41226713234455427 0.5 -0.50 0.5 0.5 camera_color_optical_frame world 100
+   -->
+ <!-- test 2 calibration -->
+  <!-- rosrun tf static_transform_publisher 0.07123003258747713 0.35571475110256985 0.41226713234455427 0.4887060558 -0.5110444120 0.4843177278 0.5152051422 camera_color_optical_frame world 100
+   -->
+ 
+
+
+
+  <!-- command line
+  rosrun tf static_transform_publisher  0.05023003258747713 0.36571475110256985 0.41226713234455427 0.5 -0.50 0.5 0.5 camera_color_optical_frame world 100
+  -->
 
 </launch>

@@ -1262,10 +1262,6 @@ unistd.h
 winsock2.h
 -
 
-/home/group8/interbotix_ws/src/moveit/moveit_ros/benchmarks/src/BenchmarkOptions.cpp
-moveit/benchmarks/BenchmarkOptions.h
--
-
 /home/group8/interbotix_ws/src/moveit/moveit_ros/occupancy_map_monitor/include/moveit/occupancy_map_monitor/occupancy_map_monitor.h
 vector
 -
