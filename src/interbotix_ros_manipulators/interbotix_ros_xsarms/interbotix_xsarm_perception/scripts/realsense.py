@@ -48,6 +48,7 @@ class PixelSelector:
             mask = cv2.inRange(frame, lower_blue, upper_blue)
             # cv2.imshow('frame', mask)
             # cv2.waitKey()
+            # hi again
     
             # okay now lets create contours so we can identify the blue objects
             bluecnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
