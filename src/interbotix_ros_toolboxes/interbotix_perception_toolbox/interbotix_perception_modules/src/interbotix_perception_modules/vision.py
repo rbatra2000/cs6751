@@ -20,7 +20,7 @@ MAX_LEAF_AREA = 500
 class Grape:
     def __init__(self, name, loc, bias):
         self.name = name
-        self.loc = loc
+        self.loc = loc # testing
         self.bias = bias
 
 class PixelSelector:
